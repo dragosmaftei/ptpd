@@ -197,6 +197,7 @@ void
 protocol(RunTimeOpts *rtOpts, PtpClock *ptpClock)
 {
 	DBG("event POWERUP\n");
+	INFO("DM: starting protocol\n");
 
 	timerStart(&ptpClock->timers[TIMINGDOMAIN_UPDATE_TIMER],timingDomain.updateInterval);
 	timerStart(&ptpClock->timers[ALARM_UPDATE_TIMER],ALARM_UPDATE_INTERVAL);
@@ -356,6 +357,8 @@ void setPortState(PtpClock *ptpClock, Enumeration8 state)
 void
 toState(UInteger8 state, const RunTimeOpts *rtOpts, PtpClock *ptpClock)
 {
+	INFO("DM: toState starting\n");
+
 	ptpClock->message_activity = TRUE;
 	
 	/* leaving state tasks */
@@ -914,9 +917,9 @@ doState(RunTimeOpts *rtOpts, PtpClock *ptpClock)
 				 */
 				    toState(PTP_LISTENING, rtOpts, ptpClock);
 				    }
-                                }
+			}
 
-                }
+		}
 
 		/* Reset the slave if clock update timeout configured */
 		if ( ptpClock->portDS.portState == PTP_SLAVE && (rtOpts->clockUpdateTimeout > 0) &&
@@ -2925,6 +2928,7 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
 static void
 issueSync(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 {
+	INFO("DM: issueSync starting\n");
 	Integer32 dst = 0;
 	int i = 0;
 	UnicastGrantData *grant = NULL;
