@@ -1715,6 +1715,8 @@ msgPackHeader(Octet * buf, PtpClock * ptpClock)
 void
 msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, PtpClock * ptpClock)
 {
+    INFO("DM: msgPackSync starting\n");
+
 	msgPackHeader(buf, ptpClock);
 
 	/* changes in header */
@@ -1745,6 +1747,8 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
 void
 msgUnpackSync(Octet * buf, MsgSync * sync)
 {
+    INFO("DM: msgUnpackSync starting\n");
+
 	sync->originTimestamp.secondsField.msb =
 		flip16(*(UInteger16 *) (buf + 34));
 	sync->originTimestamp.secondsField.lsb =
@@ -2158,6 +2162,8 @@ msgUnpackPdelayRespFollowUp(Octet * buf, MsgPdelayRespFollowUp * prespfollow)
 void
 msgPackManagementTLV(Octet *buf, MsgManagement *outgoing, PtpClock *ptpClock)
 {
+    INFO("DM: msgPackManagementTLV starting\n");
+
         DBGV("packing ManagementTLV message \n");
 
 	UInteger16 dataLength = 0;
