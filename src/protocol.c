@@ -1241,6 +1241,8 @@ void
 processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp, ssize_t length)
 {
 
+	INFO("DM: processMessage starting\n");
+
     Boolean isFromSelf;
 
     /*

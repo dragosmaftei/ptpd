@@ -1529,6 +1529,8 @@ packMsgHeader(MsgHeader *h, Octet *buf)
 void
 unpackManagementTLV(Octet *buf, int baseOffset, MsgManagement *m, PtpClock* ptpClock)
 {
+    INFO("DM: unpackManagementTLV starting\n");
+
 	int offset = 0;
 	XMALLOC(m->tlv, sizeof(ManagementTLV));
 	/* read the management TLV */
@@ -1541,6 +1543,8 @@ unpackManagementTLV(Octet *buf, int baseOffset, MsgManagement *m, PtpClock* ptpC
 void
 packManagementTLV(ManagementTLV *tlv, Octet *buf)
 {
+    INFO("DM: packManagementTLV starting\n");
+
 	int offset = 0;
 	#define OPERATE( name, size, type ) \
 		pack##type( &tlv->name, buf + MANAGEMENT_LENGTH + offset ); \
@@ -1601,6 +1605,8 @@ void unpackMsgManagement(Octet *buf, MsgManagement *m, PtpClock *ptpClock)
 void
 unpackSignalingTLV(Octet *buf, MsgSignaling *m, PtpClock* ptpClock)
 {
+    INFO("DM: unpackSignalingTLV starting\n");
+
 	int offset = 0;
 	XMALLOC(m->tlv, sizeof(SignalingTLV));
 	/* read the signaling TLV */
@@ -1613,6 +1619,8 @@ unpackSignalingTLV(Octet *buf, MsgSignaling *m, PtpClock* ptpClock)
 void
 packSignalingTLV(SignalingTLV *tlv, Octet *buf)
 {
+    INFO("DM: packSignalingTLV\n");
+
 	int offset = 0;
 	#define OPERATE( name, size, type ) \
 		pack##type( &tlv->name, buf + SIGNALING_LENGTH + offset ); \
@@ -1666,6 +1674,8 @@ unpackMsgSignaling(Octet *buf, MsgSignaling *m, PtpClock *ptpClock)
 void
 msgUnpackHeader(Octet * buf, MsgHeader * header)
 {
+    INFO("DM: msgUnpackHeader starting\n");
+
 	header->transportSpecific = (*(Nibble *) (buf + 0)) >> 4;
 	header->messageType = (*(Enumeration4 *) (buf + 0)) & 0x0F;
 	header->versionPTP = (*(UInteger4 *) (buf + 1)) & 0x0F;
