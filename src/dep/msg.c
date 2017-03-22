@@ -1736,7 +1736,11 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
 	/* Two step flag - table 20: Sync and PdelayResp only */
 	if (ptpClock->defaultDS.twoStepFlag)
 		*(UInteger8 *) (buf + 6) |= PTP_TWO_STEP;
-	/* Table 19 */
+
+    // DM: adding security flag just to sync messages
+    *(UInteger8 *) (buf + 6) |= PTP_SECURITY;
+
+    /* Table 19 */
 	*(UInteger16 *) (buf + 2) = flip16(SYNC_LENGTH);
 	*(UInteger16 *) (buf + 30) = flip16(sequenceId);
 	*(UInteger8 *) (buf + 32) = 0x00;

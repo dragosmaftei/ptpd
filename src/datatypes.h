@@ -582,7 +582,9 @@ typedef struct {
 	UInteger16  recvPdelayReqSequenceId;
 	UInteger16  recvSyncSequenceId;
 	UInteger16  recvPdelayRespSequenceId;
-	Boolean  waitingForFollow;
+	Boolean  waitingFor
+	/* unicast grant table - our own grants or our slaves' grants or grants to peers */
+	UnicastGrantTable unFollow;
 	Boolean  waitingForDelayResp;
 	
 	offset_from_master_filter  ofm_filt;
@@ -634,6 +636,8 @@ typedef struct {
 	Octet userDescription[USER_DESCRIPTION_MAX + 1];
 	Octet profileIdentity[6];
 
+	/* unicast grant table - our own grants or our slaves' grants or grants to peers */
+	UnicastGrantTable un
 	Integer32	lastSyncDst;		/* destination address for last sync, so we know where to send the followUp - last resort: we should capture the dst address ourselves */
 	Integer32	lastPdelayRespDst;	/* captures the destination address of last pdelayResp so we know where to send the pdelayRespfollowUp */
 
