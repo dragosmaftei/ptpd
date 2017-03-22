@@ -1741,7 +1741,8 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
     *(UInteger8 *) (buf + 6) |= PTP_SECURITY;
 
     /* Table 19 */
-	*(UInteger16 *) (buf + 2) = flip16(SYNC_LENGTH);
+	// DM: adding 1 byte to header message length
+    *(UInteger16 *) (buf + 2) = flip16(SYNC_LENGTH + 1);
 	*(UInteger16 *) (buf + 30) = flip16(sequenceId);
 	*(UInteger8 *) (buf + 32) = 0x00;
 
@@ -1754,6 +1755,10 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
 	*(UInteger16 *) (buf + 34) = flip16(originTimestamp->secondsField.msb);
 	*(UInteger32 *) (buf + 36) = flip32(originTimestamp->secondsField.lsb);
 	*(UInteger32 *) (buf + 40) = flip32(originTimestamp->nanosecondsField);
+
+    // DM: add extra byte
+    *(UInteger8 *) (buf + 44) = 0xDD;
+
 }
 #endif /* PTPD_SLAVE_ONLY */
 

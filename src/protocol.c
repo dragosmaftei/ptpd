@@ -3021,7 +3021,8 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 
 	msgPackSync(ptpClock->msgObuf,*sequenceId,&originTimestamp,ptpClock);
 
-	if (!netSendEvent(ptpClock->msgObuf,SYNC_LENGTH,&ptpClock->netPath,
+    // DM: add +1 to the length of the packet to send, since we packed an extra byte in msgPackSync
+	if (!netSendEvent(ptpClock->msgObuf,SYNC_LENGTH+1,&ptpClock->netPath,
 		rtOpts, dst, &internalTime)) {
 		toState(PTP_FAULTY,rtOpts,ptpClock);
 		ptpClock->counters.messageSendErrors++;

@@ -449,6 +449,13 @@ typedef struct {
 	Octet* valueField;
 } SignalingTLV;
 
+/* Security TLV struct */
+typedef struct {
+	#define OPERATE( name, size, type) type name;
+	#include "def/securityTLV/securityTLV.def"
+
+} SecurityTLV;
+
 /**
  * \brief Signaling TLV Request Unicast Transmission fields (Table 73 of the spec)
  */
