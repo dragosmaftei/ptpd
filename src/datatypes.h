@@ -11,7 +11,6 @@
 #endif /* PTPD_STATISTICS */
 #include "dep/alarms.h"
 
-
 /**
  * \struct PtpdCounters
  * \brief Ptpd engine counters per port
@@ -582,7 +581,7 @@ typedef struct {
 	UInteger16  recvPdelayReqSequenceId;
 	UInteger16  recvSyncSequenceId;
 	UInteger16  recvPdelayRespSequenceId;
-	Boolean  waitingFor
+	Boolean  waitingFor;
 	/* unicast grant table - our own grants or our slaves' grants or grants to peers */
 	UnicastGrantTable unFollow;
 	Boolean  waitingForDelayResp;
@@ -637,7 +636,7 @@ typedef struct {
 	Octet profileIdentity[6];
 
 	/* unicast grant table - our own grants or our slaves' grants or grants to peers */
-	UnicastGrantTable un
+	UnicastGrantTable un;
 	Integer32	lastSyncDst;		/* destination address for last sync, so we know where to send the followUp - last resort: we should capture the dst address ourselves */
 	Integer32	lastPdelayRespDst;	/* captures the destination address of last pdelayResp so we know where to send the pdelayRespfollowUp */
 
