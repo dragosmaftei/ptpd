@@ -1,4 +1,17 @@
 /* to use these definitions, #define OPERATE then #include this file in your source */
 OPERATE( tlvType, 2, Enumeration16)
 OPERATE( lengthField, 2, UInteger16)
+// SPI 1 octet
+OPERATE( SPI, 1, UInteger8)
+// keyID 4 octets
+OPERATE( keyID, 4, UInteger32)
+// secParamIndicator 1 octet
+OPERATE ( secParamIndicator, 1, Octet)
+// disclosedKey (optional) variable, only for delayed security processing
+// sequenceNo (optional) variable
+// reserved (optional) variable
+// ICV.. length dependent upon the IntegrityAlgTyp
+
+OPERATE ( ICV, 1, UInteger8)
+
 #undef OPERATE

@@ -1742,7 +1742,7 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
 
     /* Table 19 */
 	// DM: adding 1 byte to header message length
-    *(UInteger16 *) (buf + 2) = flip16(SYNC_LENGTH + 1);
+    *(UInteger16 *) (buf + 2) = flip16(SYNC_LENGTH + sizeof(SecurityTLV));
 	*(UInteger16 *) (buf + 30) = flip16(sequenceId);
 	*(UInteger8 *) (buf + 32) = 0x00;
 
@@ -1756,8 +1756,15 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
 	*(UInteger32 *) (buf + 36) = flip32(originTimestamp->secondsField.lsb);
 	*(UInteger32 *) (buf + 40) = flip32(originTimestamp->nanosecondsField);
 
-    // DM: add extra byte
-    *(UInteger8 *) (buf + 44) = 0xDD;
+    // DM: add tlv
+    SecurityTLV *sec_tlv = (SecurityTLV *)(buf + 44);
+    memset(sec_tlv, 0x00, sizeof(SecurityTLV));
+    sec_tlv->tlvType = flip16(SECURITY);
+    sec_tlv->lengthField = flip16(0x1234);
+    sec_tlv->SPI = 0xab;
+    sec_tlv->keyID = flip32(0x5678abcd);
+    sec_tlv->secParamIndicator = 0xef;
+    sec_tlv->ICV = 0x42;
 
 }
 #endif /* PTPD_SLAVE_ONLY */
