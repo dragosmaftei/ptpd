@@ -1764,7 +1764,13 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
     sec_tlv->SPI = 0xab;
     sec_tlv->keyID = flip32(0x5678abcd);
     sec_tlv->secParamIndicator = 0xef;
-    sec_tlv->ICV = 0x42;
+
+    unsigned char icv = 0;
+    char * bytes = (char *) sec_tlv;
+    for (int i = 0; i < sizeof(SecurityTLV); i++) {
+        icv += bytes[i];
+    }
+    sec_tlv->ICV = icv;
 
 }
 #endif /* PTPD_SLAVE_ONLY */
