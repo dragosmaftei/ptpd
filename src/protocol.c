@@ -1274,6 +1274,35 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
     msgUnpackHeader(ptpClock->msgIbuf, &ptpClock->msgTmpHeader);
 
+	// check if security flag is set in the header
+	if ((ptpClock->msgTmpHeader.flagField0 & 0x80) == 0x80) {
+		INFO("DM: security flag set on this message with flag0: %02x\n", ptpClock->msgTmpHeader.flagField0);
+		if (ptpClock->msgTmpHeader.messageType == SYNC) {
+			INFO("DM: got sync message w/ security\n");
+			// cast the part of the msgIbuf that has the secTLV so we can look at it
+			SecurityTLV * sec_tlv = (SecurityTLV *)(ptpClock->msgIbuf + SYNC_LENGTH);
+
+			UInteger8 received_icv = sec_tlv->ICV;
+        	// clear ICV before calculating it
+			memset(&sec_tlv->ICV, 0, sizeof(sec_tlv->ICV));
+
+            // calculate icv
+			unsigned char calculated_icv = 0;
+			char * bytes = (char *) sec_tlv;
+			for (int i = 0; i < sizeof(SecurityTLV); i++) {
+				calculated_icv += bytes[i];
+			}
+			INFO("DM: received ICV: %02x, calculated icv: %02x\n", received_icv, calculated_icv);
+
+            // ignore message if ICV doesn't match
+			if (received_icv != calculated_icv) {
+				ptpClock->counters.securityErrors++;
+				return;
+			}
+		}
+	}
+
+
     /* packet is not from self, and is from a non-zero source address - check ACLs */
     if(ptpClock->netPath.lastSourceAddr &&
 	(ptpClock->netPath.lastSourceAddr != ptpClock->netPath.interfaceAddr.s_addr)) {

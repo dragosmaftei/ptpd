@@ -76,6 +76,7 @@ typedef struct
 	uint32_t sequenceMismatchErrors;  /* mismatched sequence IDs - also increments discarded */
 	uint32_t delayMechanismMismatchErrors; /* P2P received, E2E expected or vice versa - incremets discarded */
 	uint32_t consecutiveSequenceErrors;    /* number of consecutive sequence mismatch errors */
+    uint32_t securityErrors; /* icv didn't match... */
 
 	/* unicast sgnaling counters */
 	uint32_t unicastGrantsRequested;  /* slave: how many we requested, master: how many requests we received */

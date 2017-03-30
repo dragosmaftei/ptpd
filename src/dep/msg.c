@@ -1651,6 +1651,16 @@ packMsgSignaling(MsgSignaling *m, Octet *buf)
 	#define OPERATE( name, size, type) \
 		pack##type (&data->name, buf + offset); \
 		offset = offset + size;
+/*
+    OPERATE( header, 34, MsgHeader)
+    OPERATE( targetPortIdentity, 10, PortIdentity)
+
+    packMsgHeader(&data->header, buf + offset);
+    offset = offset + 34;
+
+    packPortIdentity(&data->targetPortIdentity, buf + offset);
+    offset = offset + 10;
+ */
 	#include "../def/message/signaling.def"
 
 }
@@ -2310,8 +2320,7 @@ msgPackManagementTLV(Octet *buf, MsgManagement *outgoing, PtpClock *ptpClock)
         case MM_LOG_SYNC_INTERVAL:
                 dataLength = packMMLogSyncInterval(outgoing, buf);
                 #ifdef PTPD_DBG
-                mMLogSyncInterval_display(
-                                (MMLogSyncInterval*)outgoing->tlv->dataField, ptpClock);
+                mMLogSyncInterval_display((MMLogSyncInterval*)outgoing->tlv->dataField, ptpClock);
                 #endif /* PTPD_DBG */
                 break;
         case MM_VERSION_NUMBER:
