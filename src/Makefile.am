@@ -7,7 +7,7 @@ man_MANS = ptpd2.8 ptpd2.conf.5
 
 AM_CFLAGS	= $(SNMP_CFLAGS) $(PCAP_CFLAGS) -Wall -fexceptions
 AM_CPPFLAGS	= $(SNMP_CPPFLAGS) $(PCAP_CPPFLAGS)
-AM_LDFLAGS	= $(SNMP_LIBS) $(PCAP_LIBS)
+AM_LDFLAGS	= $(SNMP_LIBS) $(PCAP_LIBS) -lssl -lcrypto
 
 if LINUX_KERNEL_HEADERS
 AM_CFLAGS += $(LINUX_KERNEL_INCLUDES)
@@ -65,6 +65,8 @@ ptpd2_SOURCES =				\
 	dep/alarms.c			\
 	ptpd.c				\
 	ptpd.h				\
+	dm_security.h       \
+	dm_security.c       \
 	$(NULL)
 
 # SNMP

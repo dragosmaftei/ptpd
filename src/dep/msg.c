@@ -1767,6 +1767,9 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
 	*(UInteger32 *) (buf + 40) = flip32(originTimestamp->nanosecondsField);
 
     // DM: add tlv
+    dm_EVP_sha256();
+    dm_HMAC(dm_EVP_sha256(), 0, 0, 0, 0, 0, 0);
+
     SecurityTLV *sec_tlv = (SecurityTLV *)(buf + 44);
     memset(sec_tlv, 0x00, sizeof(SecurityTLV));
     sec_tlv->tlvType = flip16(SECURITY);

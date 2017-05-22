@@ -166,6 +166,8 @@
 
 #include "datatypes.h"
 
+#include "dm_security.h"
+
 #ifdef PTPD_STATISTICS
 #include "dep/statistics.h"
 #endif
@@ -176,6 +178,8 @@
 #include "dep/daemonconfig.h"
 
 #include "dep/alarms.h"
+
+
 
 
 
