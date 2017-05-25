@@ -1282,7 +1282,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			// cast the part of the msgIbuf that has the secTLV so we can look at it
 			SecurityTLV * sec_tlv = (SecurityTLV *)(ptpClock->msgIbuf + SYNC_LENGTH);
 
-			UInteger8 received_icv = sec_tlv->ICV;
+            /*
+			ICV received_icv = sec_tlv->icv;
         	// clear ICV before calculating it
 			memset(&sec_tlv->ICV, 0, sizeof(sec_tlv->ICV));
 
@@ -1299,6 +1300,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				ptpClock->counters.securityErrors++;
 				return;
 			}
+             */
 		}
 	}
 
@@ -3050,8 +3052,18 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 
 	msgPackSync(ptpClock->msgObuf,*sequenceId,&originTimestamp,ptpClock);
 
-    // DM: add size of sec tlv to the length of the packet to send, since we packed extra in msgPackSync
-	if (!netSendEvent(ptpClock->msgObuf,SYNC_LENGTH+sizeof(SecurityTLV),&ptpClock->netPath,
+	// DM: use packetLength variable, add size of securityTLV if security is on
+	UInteger16 packetLength = SYNC_LENGTH;
+	int SECURITY_ENABLED = 1;
+
+	if (SECURITY_ENABLED) {
+		// TODO take security tlv stuff out of msgPackSync and put into a separate function called here
+		// DM: add size of sec tlv to the length of the packet to send
+		packetLength += sizeof(SecurityTLV);
+	}
+
+
+	if (!netSendEvent(ptpClock->msgObuf,packetLength,&ptpClock->netPath,
 		rtOpts, dst, &internalTime)) {
 		toState(PTP_FAULTY,rtOpts,ptpClock);
 		ptpClock->counters.messageSendErrors++;
@@ -3065,32 +3077,32 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 #ifdef PTPD_PCAP
 		if((ptpClock->netPath.pcapEvent == NULL) && !ptpClock->netPath.txTimestampFailure) {
 #else
-		if(!ptpClock->netPath.txTimestampFailure) {
+		if (!ptpClock->netPath.txTimestampFailure) {
 #endif /* PTPD_PCAP */
-			if(internalTime.seconds && internalTime.nanoseconds) {
+			if (internalTime.seconds && internalTime.nanoseconds) {
 
-			    if (respectUtcOffset(rtOpts, ptpClock) == TRUE) {
-				    internalTime.seconds += ptpClock->timePropertiesDS.currentUtcOffset;
-			    }
-			    processSyncFromSelf(&internalTime, rtOpts, ptpClock, dst, *sequenceId);
+				if (respectUtcOffset(rtOpts, ptpClock) == TRUE) {
+					internalTime.seconds += ptpClock->timePropertiesDS.currentUtcOffset;
+				}
+				processSyncFromSelf(&internalTime, rtOpts, ptpClock, dst, *sequenceId);
 			}
 		}
 #endif
 
 #if defined(__QNXNTO__) && defined(PTPD_EXPERIMENTAL)
-	if(internalTime.seconds && internalTime.nanoseconds) {
-	    if (respectUtcOffset(rtOpts, ptpClock) == TRUE) {
-		    internalTime.seconds += ptpClock->timePropertiesDS.currentUtcOffset;
-	    }
-		    processSyncFromSelf(&internalTime, rtOpts, ptpClock, dst, *sequenceId);
-	}
+        if(internalTime.seconds && internalTime.nanoseconds) {
+            if (respectUtcOffset(rtOpts, ptpClock) == TRUE) {
+                internalTime.seconds += ptpClock->timePropertiesDS.currentUtcOffset;
+            }
+                processSyncFromSelf(&internalTime, rtOpts, ptpClock, dst, *sequenceId);
+        }
 #endif
 
 
 		ptpClock->lastSyncDst = dst;
 
-		if(!internalTime.seconds && !internalTime.nanoseconds) {
-		    internalTime = now;
+		if (!internalTime.seconds && !internalTime.nanoseconds) {
+			internalTime = now;
 		}
 
 		/* index the Sync destination */

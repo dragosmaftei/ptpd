@@ -449,6 +449,11 @@ typedef struct {
 	Octet* valueField;
 } SignalingTLV;
 
+// DM:  struct for ICV, used in the SecurityTLV definition
+typedef struct {
+	char digest[16];
+} ICV;
+
 /* Security TLV struct */
 typedef struct {
 	#define OPERATE( name, size, type) type name;

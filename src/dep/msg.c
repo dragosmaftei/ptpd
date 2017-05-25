@@ -1751,7 +1751,7 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
     *(UInteger8 *) (buf + 6) |= PTP_SECURITY;
 
     /* Table 19 */
-	// DM: adding 1 byte to header message length
+	// DM: adjusting the header's message length field to account for sec TLV
     *(UInteger16 *) (buf + 2) = flip16(SYNC_LENGTH + sizeof(SecurityTLV));
 	*(UInteger16 *) (buf + 30) = flip16(sequenceId);
 	*(UInteger8 *) (buf + 32) = 0x00;
@@ -1773,17 +1773,25 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
     SecurityTLV *sec_tlv = (SecurityTLV *)(buf + 44);
     memset(sec_tlv, 0x00, sizeof(SecurityTLV));
     sec_tlv->tlvType = flip16(SECURITY);
-    sec_tlv->lengthField = flip16(0x1234);
-    sec_tlv->SPI = 0xab;
-    sec_tlv->keyID = flip32(0x5678abcd);
-    sec_tlv->secParamIndicator = 0xef;
+    sec_tlv->lengthField = flip16(26);
+    sec_tlv->SPI = 0xab; // used to query SAD
+    sec_tlv->keyID = flip32(0x5678abcd); // just 4 bytes, but supposed to be the key, which is 32??
+    sec_tlv->secParamIndicator = 0x00;
 
-    unsigned char icv = 0;
-    char * bytes = (char *) sec_tlv;
-    for (int i = 0; i < sizeof(SecurityTLV); i++) {
-        icv += bytes[i];
-    }
-    sec_tlv->ICV = icv;
+    int key_len = 32;
+    char *key = "12345678123456781234567812345678";
+
+    unsigned char *static_digest;
+
+    // want from header all the way up to ICV, so 44 for SYNCLENGTH, + TLV (32 b/c padding) - ICV (16)
+    static_digest = dm_HMAC(dm_EVP_sha256(), key, key_len,
+                            (unsigned char *) buf, SYNC_LENGTH + sizeof(SecurityTLV) - sizeof(ICV),
+                            NULL, NULL);
+
+    // is this correct 'truncation' to 128 bits??
+    memcpy(sec_tlv->icv.digest, static_digest, 16);
+
+    INFO("DM: ICV starts with: %c\n", sec_tlv->icv.digest[0]);
 
 }
 #endif /* PTPD_SLAVE_ONLY */

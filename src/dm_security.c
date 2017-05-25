@@ -5,10 +5,17 @@
 #include <openssl/hmac.h> // includes HMAC and EVP_sha256()
 //#include <openssl/evp.h> // this has EVP_sha256() only
 
+/*
+ * just call the actual openssl version
+ */
 void *dm_EVP_sha256() {
     return (void *)EVP_sha256();
 }
 
+/*
+ * call the openssl version, and now that we have the openssl structs w/ no
+ * conflicts, can cast the evp_md from void* to EVP_MD *
+ */
 unsigned char *dm_HMAC(void *evp_md, const void *key,
                        int key_len, const unsigned char *d, int n,
                        unsigned char *md, unsigned int *md_len) {

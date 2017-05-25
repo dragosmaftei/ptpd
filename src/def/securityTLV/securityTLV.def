@@ -6,12 +6,14 @@ OPERATE( SPI, 1, UInteger8)
 // keyID 4 octets
 OPERATE( keyID, 4, UInteger32)
 // secParamIndicator 1 octet
+// either 0x00 for immediate, or 0x04 for delayed
 OPERATE ( secParamIndicator, 1, Octet)
 // disclosedKey (optional) variable, only for delayed security processing
-// sequenceNo (optional) variable
-// reserved (optional) variable
-// ICV.. length dependent upon the IntegrityAlgTyp
+// sequenceNo (optional) variable, not used
+// reserved (optional) variable, not used
 
-OPERATE ( ICV, 1, UInteger8)
+// ICV.. length dependent upon the IntegrityAlgTyp, which for now is assumed to be
+// HMAC-SHA256-128; output (the MAC, i.e. the ICV) is truncated to 128 bits = 16 bytes
+OPERATE ( icv, 16, ICV)
 
 #undef OPERATE
