@@ -137,6 +137,7 @@ section 7.6.2.5, page 56:
 #define SIGNALING_LENGTH				44
 #define TLV_LENGTH					6
 #define TL_LENGTH					4
+#define SEC_TLV_IMM_HMACSHA256_LENGTH   26
 /** \}*/
 
 /*Enumeration defined in tables of the spec*/

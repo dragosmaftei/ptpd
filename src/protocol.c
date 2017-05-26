@@ -1280,7 +1280,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 		if (ptpClock->msgTmpHeader.messageType == SYNC) {
 			INFO("DM: got sync message w/ security\n");
 			// cast the part of the msgIbuf that has the secTLV so we can look at it
-			SecurityTLV * sec_tlv = (SecurityTLV *)(ptpClock->msgIbuf + SYNC_LENGTH);
+			//SecurityTLV * sec_tlv = (SecurityTLV *)(ptpClock->msgIbuf + SYNC_LENGTH);
 
             /*
 			ICV received_icv = sec_tlv->icv;
@@ -3059,7 +3059,7 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 	if (SECURITY_ENABLED) {
 		// TODO take security tlv stuff out of msgPackSync and put into a separate function called here
 		// DM: add size of sec tlv to the length of the packet to send
-		packetLength += sizeof(SecurityTLV);
+		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}
 
 
