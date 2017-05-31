@@ -192,7 +192,13 @@ void
 packICV(void *icv, void *buf)
 {
     // TODO
+    *(ICV *)buf = * (ICV *)icv;
+}
 
+void
+unpackICV(void *buf, void *icv, PtpClock *ptpClock)
+{
+    packICV(buf, icv);
 }
 
 /* NOTE: the unpack functions for management messages can probably be refactored into a macro */
@@ -1737,6 +1743,17 @@ msgPackHeader(Octet * buf, PtpClock * ptpClock)
 	*(UInteger8 *) (buf + 33) = 0x7F;
 }
 
+void
+msgUnpackSecurityTLV(Octet * buf, SecurityTLV *data, PtpClock *ptpClock)
+{
+    int offset = 0;
+
+    #define OPERATE( name, size, type) \
+	    	    unpack##type (buf + offset, &data->name, ptpClock); \
+		        offset = offset + size;
+
+    #include "../def/securityTLV/securityTLV.def"
+}
 
 #ifndef PTPD_SLAVE_ONLY
 /*Pack SYNC message into OUT buffer of ptpClock*/

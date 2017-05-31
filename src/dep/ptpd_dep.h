@@ -335,6 +335,9 @@ UInteger16 packSMCancelUnicastTransmission( MsgSignaling*, Octet*);
 void unpackSMAcknowledgeCancelUnicastTransmission( Octet* buf, MsgSignaling*, PtpClock* );
 UInteger16 packSMAcknowledgeCancelUnicastTransmission( MsgSignaling*, Octet*);
 
+/* Security TLV packing / unpacking */
+void msgUnpackSecurityTLV(Octet * buf, SecurityTLV *data, PtpClock *ptpClock);
+
 void unpackPortAddress( Octet* buf, PortAddress*, PtpClock*);
 void packPortAddress( PortAddress*, Octet*);
 void freePortAddress( PortAddress*);

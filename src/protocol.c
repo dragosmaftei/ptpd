@@ -52,6 +52,7 @@
  */
 
 #include "ptpd.h"
+#include "ptp_datatypes.h"
 
 Boolean doInit(RunTimeOpts*,PtpClock*);
 static void doState(RunTimeOpts*,PtpClock*);
@@ -1279,7 +1280,18 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 		INFO("DM: security flag set on this message with flag0: %02x\n", ptpClock->msgTmpHeader.flagField0);
 		if (ptpClock->msgTmpHeader.messageType == SYNC) {
 			INFO("DM: got sync message w/ security\n");
-			// cast the part of the msgIbuf that has the secTLV so we can look at it
+
+            SecurityTLV sec_tlv;
+
+            // pack the buffer to avoid the padding inherent in structs, with 0 for the ICV
+            // start at end of sync message
+
+            msgUnpackSecurityTLV(ptpClock->msgIbuf + SYNC_LENGTH, &sec_tlv, ptpClock);
+
+            INFO("DM: type: %02x, length: %02x, spi: %01x, keyid: %04x, secparamind: %01x, icv: %016x\n",
+                sec_tlv.tlvType, sec_tlv.lengthField, sec_tlv.SPI, sec_tlv.keyID, sec_tlv.secParamIndicator, sec_tlv.icv);
+
+            // cast the part of the msgIbuf that has the secTLV so we can look at it
 			//SecurityTLV * sec_tlv = (SecurityTLV *)(ptpClock->msgIbuf + SYNC_LENGTH);
 
             /*
