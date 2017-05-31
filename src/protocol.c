@@ -1294,6 +1294,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
             INFO("DM: hex dump of ICV after copied into struct:");
             for (int i = 0; i < sizeof(ICV); i++)
                 INFO("DM: icv: %02x\n", sec_tlv.icv.digest[i]);
+
             // cast the part of the msgIbuf that has the secTLV so we can look at it
 			//SecurityTLV * sec_tlv = (SecurityTLV *)(ptpClock->msgIbuf + SYNC_LENGTH);
 
