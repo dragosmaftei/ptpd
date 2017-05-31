@@ -1777,7 +1777,7 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
 
     /* Table 19 */
 	// DM: adjusting the header's message length field to account for sec TLV
-    *(UInteger16 *) (buf + 2) = flip16(SYNC_LENGTH + sizeof(SecurityTLV));
+    *(UInteger16 *) (buf + 2) = flip16(SYNC_LENGTH + SEC_TLV_IMM_HMACSHA256_LENGTH);
 	*(UInteger16 *) (buf + 30) = flip16(sequenceId);
 	*(UInteger8 *) (buf + 32) = 0x00;
 
