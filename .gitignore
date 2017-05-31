@@ -35,3 +35,5 @@ ptpd*.tar.gz
 /src/ptpd2.8
 /src/ptpd2.conf.5
 .idea
+# ignore Makefile.am so changes between linux and mac version remain
+/src/Makefile.am

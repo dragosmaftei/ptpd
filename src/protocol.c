@@ -1288,12 +1288,13 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
             msgUnpackSecurityTLV(ptpClock->msgIbuf + SYNC_LENGTH, &sec_tlv, ptpClock);
 
-            INFO("DM: seqid: %04x, type: %04x, length: %04x, spi: %02x, keyid: %08x, secparamind: %02x\n",
-                ptpClock->msgTmpHeader.sequenceId, sec_tlv.tlvType, sec_tlv.lengthField, sec_tlv.SPI, sec_tlv.keyID, sec_tlv.secParamIndicator);
+            INFO("DM: seqid: %04x, type: %04x, length: %04x, spi: %02x, keyid: %08x, secparamind: %02x, icv 1st byte: %02x\n",
+                ptpClock->msgTmpHeader.sequenceId, sec_tlv.tlvType, sec_tlv.lengthField, sec_tlv.SPI, sec_tlv.keyID, sec_tlv.secParamIndicator, sec_tlv.icv.digest[0]);
+            for (int i = 0; i < SEC_TLV_IMM_HMACSHA256_LENGTH; i++) {
+				INFO("DM: hex dump from buffer: %02x\n", *(char *) (ptpClock->msgIbuf + SYNC_LENGTH + i));
+			}
 
-            INFO("DM: hex dump of ICV after copied into struct:");
-            for (int i = 0; i < sizeof(ICV); i++)
-                INFO("DM: icv: %02x\n", sec_tlv.icv.digest[i]);
+
             // cast the part of the msgIbuf that has the secTLV so we can look at it
 			//SecurityTLV * sec_tlv = (SecurityTLV *)(ptpClock->msgIbuf + SYNC_LENGTH);
 
@@ -3077,7 +3078,6 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}
 
-    INFO("DM: packetlength for security enabled sync: %d\n", packetLength);
 
 	if (!netSendEvent(ptpClock->msgObuf,packetLength,&ptpClock->netPath,
 		rtOpts, dst, &internalTime)) {
