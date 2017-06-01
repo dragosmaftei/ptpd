@@ -1287,12 +1287,14 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
             // unpack starting from the sec TLV start, into the tlv struct
             msgUnpackSecurityTLV(ptpClock->msgIbuf + SYNC_LENGTH, &sec_tlv, ptpClock);
 
+			/*
             INFO("DM: seqid: %04x, type: %04x, length: %04x, spi: %02x, keyid: %08x, secparamind: %02x\n",
                 ptpClock->msgTmpHeader.sequenceId, sec_tlv.tlvType, sec_tlv.lengthField, sec_tlv.SPI, sec_tlv.keyID, sec_tlv.secParamIndicator);
 
             INFO("DM: hex dump of ICV after copied into struct:");
             for (int i = 0; i < sizeof(ICV); i++)
                 INFO("DM: icv: %02x\n", sec_tlv.icv.digest[i]);
+			*/
 
 			// calculate ICV from buffer, compare
 			int key_len = 32;
@@ -1308,33 +1310,12 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			// ICV gets truncated to 128 bits, so compare only 16 bytes
 			if (memcmp(static_digest, sec_tlv.icv.digest, sizeof(ICV))) {
 				ptpClock->counters.securityErrors++;
+				INFO("DM: icv's DIDNT MATCH on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
 				return;
 			}
 
-			INFO("DM: icv's matched");
+			INFO("DM: icv's matched on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
 
-			// cast the part of the msgIbuf that has the secTLV so we can look at it
-			//SecurityTLV * sec_tlv = (SecurityTLV *)(ptpClock->msgIbuf + SYNC_LENGTH);
-
-            /*
-			ICV received_icv = sec_tlv->icv;
-        	// clear ICV before calculating it
-			memset(&sec_tlv->ICV, 0, sizeof(sec_tlv->ICV));
-
-            // calculate icv
-			unsigned char calculated_icv = 0;
-			char * bytes = (char *) sec_tlv;
-			for (int i = 0; i < sizeof(SecurityTLV); i++) {
-				calculated_icv += bytes[i];
-			}
-			INFO("DM: received ICV: %02x, calculated icv: %02x\n", received_icv, calculated_icv);
-
-            // ignore message if ICV doesn't match
-			if (received_icv != calculated_icv) {
-				ptpClock->counters.securityErrors++;
-				return;
-			}
-             */
 		}
 	}
 
