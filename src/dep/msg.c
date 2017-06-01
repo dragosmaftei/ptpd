@@ -1766,6 +1766,57 @@ void msgPackSecurityTLV(SecurityTLV *data, Octet *buf)
 #include "../def/securityTLV/securityTLV.def"
 }
 
+/*
+ * buf is the output buffer
+ * this should be called after the buffer has been packed (including header) for the type of message
+ * TODO need to consider whether this will work for all types of messages
+ * */
+void addSecurityTLV(Octet *buf, PtpClock *ptpClock)
+{
+    // DM: adding security flag to the header
+    *(UInteger8 *) (buf + 6) |= PTP_SECURITY;
+
+    // TODO get message length out from the header
+    UInteger16  msg_len = flip16(*(UInteger16 *) (buf + 2));
+    INFO("DM: pulled out msg length: %d\n", msg_len);
+    // DM: adjusting the header's message length field to account for sec TLV
+    *(UInteger16 *) (buf + 2) = flip16(msg_len + SEC_TLV_IMM_HMACSHA256_LENGTH);
+
+    // DM: add tlv
+    // make TLV struct and populate it before packing the buffer
+    SecurityTLV sec_tlv;
+    sec_tlv.tlvType = SECURITY;
+    sec_tlv.lengthField = SEC_TLV_IMM_HMACSHA256_LENGTH;
+    sec_tlv.SPI = 0xab;
+    sec_tlv.keyID = 0x5678abcd;
+    sec_tlv.secParamIndicator = 0x00;
+    // real ICV will be calculated from the buffer after it is packed
+    memset(sec_tlv.icv.digest, 0, sizeof(ICV));
+
+    // pack the buffer to avoid the padding inherent in structs, with 0 for the ICV
+    // start at end of sync message
+    msgPackSecurityTLV(&sec_tlv, buf + msg_len);
+
+    // calculate ICV from buffer, store it in the struct, then pack it in the buffer
+    int key_len = 32;
+    char *key = "12345678123456781234567812345678";
+
+    unsigned char *static_digest;
+
+    INFO("DM: size of ICV: %d\n", sizeof(ICV));
+
+    // want from header all the way up to ICV, so 44 for SYNCLENGTH, + TLV (26) - ICV (16)
+    static_digest = dm_HMAC(dm_EVP_sha256(), key, key_len,
+                            (unsigned char *) buf, msg_len + SEC_TLV_IMM_HMACSHA256_LENGTH - sizeof(ICV),
+                            NULL, NULL);
+
+    // truncate the digest to 128 bits by copying just 16 bytes into the TLV struct
+    memcpy(sec_tlv.icv.digest, static_digest, 16);
+
+    // manually pack the ICV from the struct into the buffer
+    memcpy(buf + msg_len + SEC_TLV_IMM_HMACSHA256_LENGTH - sizeof(ICV), sec_tlv.icv.digest, sizeof(ICV));
+}
+
 #ifndef PTPD_SLAVE_ONLY
 /*Pack SYNC message into OUT buffer of ptpClock*/
 void
@@ -1783,12 +1834,8 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
 	if (ptpClock->defaultDS.twoStepFlag)
 		*(UInteger8 *) (buf + 6) |= PTP_TWO_STEP;
 
-    // DM: adding security flag just to sync messages
-    *(UInteger8 *) (buf + 6) |= PTP_SECURITY;
-
     /* Table 19 */
-	// DM: adjusting the header's message length field to account for sec TLV
-    *(UInteger16 *) (buf + 2) = flip16(SYNC_LENGTH + SEC_TLV_IMM_HMACSHA256_LENGTH);
+    *(UInteger16 *) (buf + 2) = flip16(SYNC_LENGTH);
 	*(UInteger16 *) (buf + 30) = flip16(sequenceId);
 	*(UInteger8 *) (buf + 32) = 0x00;
 
@@ -1801,40 +1848,6 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
 	*(UInteger16 *) (buf + 34) = flip16(originTimestamp->secondsField.msb);
 	*(UInteger32 *) (buf + 36) = flip32(originTimestamp->secondsField.lsb);
 	*(UInteger32 *) (buf + 40) = flip32(originTimestamp->nanosecondsField);
-
-    // DM: add tlv
-    // make TLV struct and populate it before packing the buffer
-    SecurityTLV sec_tlv;
-    sec_tlv.tlvType = SECURITY;
-    sec_tlv.lengthField = SEC_TLV_IMM_HMACSHA256_LENGTH;
-    sec_tlv.SPI = 0xab;
-    sec_tlv.keyID = 0x5678abcd;
-    sec_tlv.secParamIndicator = 0x00;
-    // real ICV will be calculated from the buffer after it is packed
-    memset(sec_tlv.icv.digest, 0, sizeof(ICV));
-
-    // pack the buffer to avoid the padding inherent in structs, with 0 for the ICV
-    // start at end of sync message
-    msgPackSecurityTLV(&sec_tlv, buf + SYNC_LENGTH);
-
-    // calculate ICV from buffer, store it in the struct, then pack it in the buffer
-    int key_len = 32;
-    char *key = "12345678123456781234567812345678";
-
-    unsigned char *static_digest;
-
-    INFO("DM: size of ICV: %d\n", sizeof(ICV));
-
-    // want from header all the way up to ICV, so 44 for SYNCLENGTH, + TLV (26) - ICV (16)
-    static_digest = dm_HMAC(dm_EVP_sha256(), key, key_len,
-                            (unsigned char *) buf, SYNC_LENGTH + SEC_TLV_IMM_HMACSHA256_LENGTH - sizeof(ICV),
-                            NULL, NULL);
-
-    // truncate the digest to 128 bits by copying just 16 bytes into the TLV struct
-    memcpy(sec_tlv.icv.digest, static_digest, 16);
-
-    // manually pack the ICV from the struct into the buffer
-    memcpy(buf + SYNC_LENGTH + SEC_TLV_IMM_HMACSHA256_LENGTH - sizeof(ICV), sec_tlv.icv.digest, sizeof(ICV));
 
 }
 #endif /* PTPD_SLAVE_ONLY */

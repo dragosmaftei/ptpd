@@ -3072,7 +3072,8 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 	int SECURITY_ENABLED = 1;
 
 	if (SECURITY_ENABLED) {
-		// TODO take security tlv stuff out of msgPackSync and put into a separate function called here
+		// in dep/msg.c
+		addSecurityTLV(ptpClock->msgObuf, ptpClock);
 		// DM: add size of sec tlv to the length of the packet to send
 		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}
