@@ -1755,6 +1755,17 @@ msgUnpackSecurityTLV(Octet * buf, SecurityTLV *data, PtpClock *ptpClock)
     #include "../def/securityTLV/securityTLV.def"
 }
 
+void msgPackSecurityTLV(SecurityTLV *data, Octet *buf)
+{
+    int offset = 0;
+
+#define OPERATE( name, size, type) \
+	    	pack##type (&data->name, buf + offset); \
+		    offset = offset + size;
+
+#include "../def/securityTLV/securityTLV.def"
+}
+
 #ifndef PTPD_SLAVE_ONLY
 /*Pack SYNC message into OUT buffer of ptpClock*/
 void
@@ -1804,15 +1815,7 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
 
     // pack the buffer to avoid the padding inherent in structs, with 0 for the ICV
     // start at end of sync message
-    int offset = SYNC_LENGTH;
-    SecurityTLV *data = &sec_tlv;
-
-    #define OPERATE( name, size, type) \
-	    	pack##type (&data->name, buf + offset); \
-		    offset = offset + size;
-
-    #include "../def/securityTLV/securityTLV.def"
-
+    msgPackSecurityTLV(&sec_tlv, buf + SYNC_LENGTH);
 
     // calculate ICV from buffer, store it in the struct, then pack it in the buffer
     int key_len = 32;
@@ -1822,7 +1825,7 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
 
     INFO("DM: size of ICV: %d\n", sizeof(ICV));
 
-    // want from header all the way up to ICV, so 44 for SYNCLENGTH, + TLV (32 b/c padding) - ICV (16)
+    // want from header all the way up to ICV, so 44 for SYNCLENGTH, + TLV (26) - ICV (16)
     static_digest = dm_HMAC(dm_EVP_sha256(), key, key_len,
                             (unsigned char *) buf, SYNC_LENGTH + SEC_TLV_IMM_HMACSHA256_LENGTH - sizeof(ICV),
                             NULL, NULL);
