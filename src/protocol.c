@@ -53,6 +53,7 @@
 
 #include "ptpd.h"
 #include "ptp_datatypes.h"
+#include "datatypes.h"
 
 Boolean doInit(RunTimeOpts*,PtpClock*);
 static void doState(RunTimeOpts*,PtpClock*);
@@ -1283,9 +1284,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
             SecurityTLV sec_tlv;
 
-            // pack the buffer to avoid the padding inherent in structs, with 0 for the ICV
-            // start at end of sync message
-
+            // unpack starting from the sec TLV start, into the tlv struct
             msgUnpackSecurityTLV(ptpClock->msgIbuf + SYNC_LENGTH, &sec_tlv, ptpClock);
 
             INFO("DM: seqid: %04x, type: %04x, length: %04x, spi: %02x, keyid: %08x, secparamind: %02x\n",
@@ -1295,7 +1294,26 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
             for (int i = 0; i < sizeof(ICV); i++)
                 INFO("DM: icv: %02x\n", sec_tlv.icv.digest[i]);
 
-            // cast the part of the msgIbuf that has the secTLV so we can look at it
+			// calculate ICV from buffer, compare
+			int key_len = 32;
+			char *key = "12345678123456781234567812345678";
+
+			unsigned char *static_digest;
+
+			// want from header all the way up to ICV, so 44 for SYNCLENGTH, + TLV (26) - ICV (16)
+			static_digest = dm_HMAC(dm_EVP_sha256(), key, key_len,
+									(unsigned char *) ptpClock->msgIbuf, SYNC_LENGTH + SEC_TLV_IMM_HMACSHA256_LENGTH - sizeof(ICV),
+									NULL, NULL);
+
+			// ICV gets truncated to 128 bits, so compare only 16 bytes
+			if (memcmp(static_digest, sec_tlv.icv.digest, sizeof(ICV))) {
+				ptpClock->counters.securityErrors++;
+				return;
+			}
+
+			INFO("DM: icv's matched");
+
+			// cast the part of the msgIbuf that has the secTLV so we can look at it
 			//SecurityTLV * sec_tlv = (SecurityTLV *)(ptpClock->msgIbuf + SYNC_LENGTH);
 
             /*
