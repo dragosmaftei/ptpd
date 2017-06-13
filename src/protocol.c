@@ -55,6 +55,8 @@
 #include "ptp_datatypes.h"
 #include "datatypes.h"
 
+#define SECURITY_ENABLED 1
+
 Boolean doInit(RunTimeOpts*,PtpClock*);
 static void doState(RunTimeOpts*,PtpClock*);
 
@@ -1276,25 +1278,41 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
     msgUnpackHeader(ptpClock->msgIbuf, &ptpClock->msgTmpHeader);
 
-	// check if security flag is set in the header
-	if ((ptpClock->msgTmpHeader.flagField0 & 0x80) == 0x80) {
-		INFO("DM: security flag set on this message with flag0: %02x\n", ptpClock->msgTmpHeader.flagField0);
-		if (ptpClock->msgTmpHeader.messageType == SYNC) {
-			INFO("DM: got sync message w/ security\n");
+    if (SECURITY_ENABLED) {
+        // check if security flag is set in the header
+        if ((ptpClock->msgTmpHeader.flagField0 & 0x80) == 0x80) {
+			INFO("DM: security flag set on this message with flag0: %02x\n", ptpClock->msgTmpHeader.flagField0);
 
-            SecurityTLV sec_tlv;
+			UInteger16 packetLength;
 
-            // unpack starting from the sec TLV start, into the tlv struct
-            msgUnpackSecurityTLV(ptpClock->msgIbuf + SYNC_LENGTH, &sec_tlv, ptpClock);
+			switch (ptpClock->msgTmpHeader.messageType) {
+				case ANNOUNCE:
+					packetLength = ANNOUNCE_LENGTH;
+					break;
+				case SYNC:
+					packetLength = SYNC_LENGTH;
+					break;
+				case FOLLOW_UP:
+					packetLength = FOLLOW_UP_LENGTH;
+					break;
+				case PDELAY_REQ:
+					packetLength = PDELAY_REQ_LENGTH;
+					break;
+				case PDELAY_RESP:
+					packetLength = PDELAY_RESP_LENGTH;
+					break;
+				case PDELAY_RESP_FOLLOW_UP:
+					packetLength = PDELAY_RESP_FOLLOW_UP_LENGTH;
+					break;
+				default:
+					packetLength = 0;
+					break;
+			}
 
-			/*
-            INFO("DM: seqid: %04x, type: %04x, length: %04x, spi: %02x, keyid: %08x, secparamind: %02x\n",
-                ptpClock->msgTmpHeader.sequenceId, sec_tlv.tlvType, sec_tlv.lengthField, sec_tlv.SPI, sec_tlv.keyID, sec_tlv.secParamIndicator);
+			SecurityTLV sec_tlv;
 
-            INFO("DM: hex dump of ICV after copied into struct:");
-            for (int i = 0; i < sizeof(ICV); i++)
-                INFO("DM: icv: %02x\n", sec_tlv.icv.digest[i]);
-			*/
+			// unpack starting from the sec TLV start, into the tlv struct
+			msgUnpackSecurityTLV(ptpClock->msgIbuf + packetLength, &sec_tlv, ptpClock);
 
 			// calculate ICV from buffer, compare
 			int key_len = 32;
@@ -1302,9 +1320,10 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
 			unsigned char *static_digest;
 
-			// want from header all the way up to ICV, so 44 for SYNCLENGTH, + TLV (26) - ICV (16)
+			// want from header all the way up to ICV, so packetlength, + TLV (26) - ICV (16)
 			static_digest = dm_HMAC(dm_EVP_sha256(), key, key_len,
-									(unsigned char *) ptpClock->msgIbuf, SYNC_LENGTH + SEC_TLV_IMM_HMACSHA256_LENGTH - sizeof(ICV),
+									(unsigned char *) ptpClock->msgIbuf,
+									packetLength + SEC_TLV_IMM_HMACSHA256_LENGTH - sizeof(ICV),
 									NULL, NULL);
 
 			// ICV gets truncated to 128 bits, so compare only 16 bytes
@@ -1315,10 +1334,14 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			}
 
 			INFO("DM: icv's matched on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
-
 		}
-	}
-
+		else {
+			// security enabled, but message is missing security flag in header
+			ptpClock->counters.securityErrors++;
+			INFO("DM: security enabled, but message is missing security flag in header on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+			return;
+		}
+    }
 
     /* packet is not from self, and is from a non-zero source address - check ACLs */
     if(ptpClock->netPath.lastSourceAddr &&
@@ -2960,7 +2983,17 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
 
 	msgPackAnnounce(ptpClock->msgObuf, *sequenceId, &originTimestamp, ptpClock);
 
-	if (!netSendGeneral(ptpClock->msgObuf,ANNOUNCE_LENGTH,
+    // DM: use packetLength variable, add size of securityTLV if security is on
+    UInteger16 packetLength = ANNOUNCE_LENGTH;
+
+    if (SECURITY_ENABLED) {
+        // in dep/msg.c
+        addSecurityTLV(ptpClock->msgObuf, ptpClock);
+        // DM: add size of sec tlv to the length of the packet to send
+        packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
+    }
+
+	if (!netSendGeneral(ptpClock->msgObuf,packetLength,
 			    &ptpClock->netPath, rtOpts, dst)) {
 		    toState(PTP_FAULTY,rtOpts,ptpClock);
 		    ptpClock->counters.messageSendErrors++;
@@ -3069,7 +3102,6 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 
 	// DM: use packetLength variable, add size of securityTLV if security is on
 	UInteger16 packetLength = SYNC_LENGTH;
-	int SECURITY_ENABLED = 1;
 
 	if (SECURITY_ENABLED) {
 		// in dep/msg.c
@@ -3142,9 +3174,19 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 	Timestamp preciseOriginTimestamp;
 	fromInternalTime(tint,&preciseOriginTimestamp);
 	
-	msgPackFollowUp(ptpClock->msgObuf,&preciseOriginTimestamp,ptpClock,sequenceId);	
+	msgPackFollowUp(ptpClock->msgObuf,&preciseOriginTimestamp,ptpClock,sequenceId);
 
-	if (!netSendGeneral(ptpClock->msgObuf,FOLLOW_UP_LENGTH,
+	// DM: use packetLength variable, add size of securityTLV if security is on
+	UInteger16 packetLength = FOLLOW_UP_LENGTH;
+
+	if (SECURITY_ENABLED) {
+		// in dep/msg.c
+		addSecurityTLV(ptpClock->msgObuf, ptpClock);
+		// DM: add size of sec tlv to the length of the packet to send
+		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
+	}
+
+	if (!netSendGeneral(ptpClock->msgObuf,packetLength,
 			    &ptpClock->netPath, rtOpts, dst)) {
 		toState(PTP_FAULTY,rtOpts,ptpClock);
 		ptpClock->counters.messageSendErrors++;
@@ -3273,7 +3315,18 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 	}
 	
 	msgPackPdelayReq(ptpClock->msgObuf,&originTimestamp,ptpClock);
-	if (!netSendPeerEvent(ptpClock->msgObuf,PDELAY_REQ_LENGTH,
+
+	// DM: use packetLength variable, add size of securityTLV if security is on
+	UInteger16 packetLength = PDELAY_REQ_LENGTH;
+
+	if (SECURITY_ENABLED) {
+		// in dep/msg.c
+		addSecurityTLV(ptpClock->msgObuf, ptpClock);
+		// DM: add size of sec tlv to the length of the packet to send
+		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
+	}
+
+	if (!netSendPeerEvent(ptpClock->msgObuf,packetLength,
 			      &ptpClock->netPath, rtOpts, dst, &internalTime)) {
 		toState(PTP_FAULTY,rtOpts,ptpClock);
 		ptpClock->counters.messageSendErrors++;
@@ -3327,7 +3380,17 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 	msgPackPdelayResp(ptpClock->msgObuf,header,
 			  &requestReceiptTimestamp,ptpClock);
 
-	if (!netSendPeerEvent(ptpClock->msgObuf,PDELAY_RESP_LENGTH,
+	// DM: use packetLength variable, add size of securityTLV if security is on
+	UInteger16 packetLength = PDELAY_RESP_LENGTH;
+
+	if (SECURITY_ENABLED) {
+		// in dep/msg.c
+		addSecurityTLV(ptpClock->msgObuf, ptpClock);
+		// DM: add size of sec tlv to the length of the packet to send
+		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
+	}
+
+	if (!netSendPeerEvent(ptpClock->msgObuf,packetLength,
 			      &ptpClock->netPath, rtOpts, dst, &internalTime)) {
 		toState(PTP_FAULTY,rtOpts,ptpClock);
 		ptpClock->counters.messageSendErrors++;
@@ -3394,8 +3457,18 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 
 	msgPackPdelayRespFollowUp(ptpClock->msgObuf,header,
 				  &responseOriginTimestamp,ptpClock, sequenceId);
-	if (!netSendPeerGeneral(ptpClock->msgObuf,
-				PDELAY_RESP_FOLLOW_UP_LENGTH,
+
+	// DM: use packetLength variable, add size of securityTLV if security is on
+	UInteger16 packetLength = PDELAY_RESP_FOLLOW_UP_LENGTH;
+
+	if (SECURITY_ENABLED) {
+		// in dep/msg.c
+		addSecurityTLV(ptpClock->msgObuf, ptpClock);
+		// DM: add size of sec tlv to the length of the packet to send
+		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
+	}
+
+	if (!netSendPeerGeneral(ptpClock->msgObuf, packetLength,
 				&ptpClock->netPath, rtOpts, dst)) {
 		toState(PTP_FAULTY,rtOpts,ptpClock);
 		ptpClock->counters.messageSendErrors++;
