@@ -466,6 +466,8 @@ typedef struct {
 	Enumeration8 timingAclOrder;
 	Enumeration8 managementAclOrder;
 
+	Boolean securityEnabled;
+
 } RunTimeOpts;
 
 

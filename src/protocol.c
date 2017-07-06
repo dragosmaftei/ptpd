@@ -55,8 +55,6 @@
 #include "ptp_datatypes.h"
 #include "datatypes.h"
 
-#define SECURITY_ENABLED 1
-
 Boolean doInit(RunTimeOpts*,PtpClock*);
 static void doState(RunTimeOpts*,PtpClock*);
 
@@ -1278,7 +1276,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
     msgUnpackHeader(ptpClock->msgIbuf, &ptpClock->msgTmpHeader);
 
-    if (SECURITY_ENABLED) {
+    if (rtOpts->securityEnabled) {
         // check if security flag is set in the header
         if ((ptpClock->msgTmpHeader.flagField0 & 0x80) == 0x80) {
 			INFO("DM: security flag set on this message with flag0: %02x\n", ptpClock->msgTmpHeader.flagField0);
@@ -2986,7 +2984,7 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
     // DM: use packetLength variable, add size of securityTLV if security is on
     UInteger16 packetLength = ANNOUNCE_LENGTH;
 
-    if (SECURITY_ENABLED) {
+    if (rtOpts->securityEnabled) {
         // in dep/msg.c
         addSecurityTLV(ptpClock->msgObuf, ptpClock);
         // DM: add size of sec tlv to the length of the packet to send
@@ -3103,7 +3101,7 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 	// DM: use packetLength variable, add size of securityTLV if security is on
 	UInteger16 packetLength = SYNC_LENGTH;
 
-	if (SECURITY_ENABLED) {
+	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
 		addSecurityTLV(ptpClock->msgObuf, ptpClock);
 		// DM: add size of sec tlv to the length of the packet to send
@@ -3179,7 +3177,7 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 	// DM: use packetLength variable, add size of securityTLV if security is on
 	UInteger16 packetLength = FOLLOW_UP_LENGTH;
 
-	if (SECURITY_ENABLED) {
+	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
 		addSecurityTLV(ptpClock->msgObuf, ptpClock);
 		// DM: add size of sec tlv to the length of the packet to send
@@ -3319,7 +3317,7 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 	// DM: use packetLength variable, add size of securityTLV if security is on
 	UInteger16 packetLength = PDELAY_REQ_LENGTH;
 
-	if (SECURITY_ENABLED) {
+	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
 		addSecurityTLV(ptpClock->msgObuf, ptpClock);
 		// DM: add size of sec tlv to the length of the packet to send
@@ -3383,7 +3381,7 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 	// DM: use packetLength variable, add size of securityTLV if security is on
 	UInteger16 packetLength = PDELAY_RESP_LENGTH;
 
-	if (SECURITY_ENABLED) {
+	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
 		addSecurityTLV(ptpClock->msgObuf, ptpClock);
 		// DM: add size of sec tlv to the length of the packet to send
@@ -3461,7 +3459,7 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 	// DM: use packetLength variable, add size of securityTLV if security is on
 	UInteger16 packetLength = PDELAY_RESP_FOLLOW_UP_LENGTH;
 
-	if (SECURITY_ENABLED) {
+	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
 		addSecurityTLV(ptpClock->msgObuf, ptpClock);
 		// DM: add size of sec tlv to the length of the packet to send

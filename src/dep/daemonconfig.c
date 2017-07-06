@@ -38,6 +38,7 @@
  */
 
 #include "../ptpd.h"
+#include "../datatypes.h"
 
 /*-
  * Helper macros - this is effectively the API for using the new config file interface.
@@ -955,6 +956,11 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 #endif
 				"ethernet", 	IEEE_802_3, NULL
 				);
+
+    // DM: trying to add security as a config file switch; works... not sure about restart flags, using PTPD_RESTART_NONE for now
+    parseResult &= configMapBoolean(opCode, opArg, dict, target, "ptpengine:security", PTPD_RESTART_NONE, &rtOpts->securityEnabled, rtOpts->securityEnabled,
+                                    "Enable experimental security feature using security TLV.");
+
 
 	parseResult &= configMapBoolean(opCode, opArg, dict, target, "ptpengine:dot1as", PTPD_UPDATE_DATASETS, &rtOpts->dot1AS, rtOpts->dot1AS,
 		"Enable TransportSpecific field compatibility with 802.1AS / AVB (requires Ethernet transport)");
