@@ -1543,7 +1543,7 @@ packMsgHeader(MsgHeader *h, Octet *buf)
 void
 unpackManagementTLV(Octet *buf, int baseOffset, MsgManagement *m, PtpClock* ptpClock)
 {
-    INFO("DM: unpackManagementTLV starting\n");
+    if(DM_MSGS) INFO("DM: unpackManagementTLV starting\n");
 
 	int offset = 0;
 	XMALLOC(m->tlv, sizeof(ManagementTLV));
@@ -1557,7 +1557,7 @@ unpackManagementTLV(Octet *buf, int baseOffset, MsgManagement *m, PtpClock* ptpC
 void
 packManagementTLV(ManagementTLV *tlv, Octet *buf)
 {
-    INFO("DM: packManagementTLV starting\n");
+    if(DM_MSGS) INFO("DM: packManagementTLV starting\n");
 
 	int offset = 0;
 	#define OPERATE( name, size, type ) \
@@ -1619,7 +1619,7 @@ void unpackMsgManagement(Octet *buf, MsgManagement *m, PtpClock *ptpClock)
 void
 unpackSignalingTLV(Octet *buf, MsgSignaling *m, PtpClock* ptpClock)
 {
-    INFO("DM: unpackSignalingTLV starting\n");
+    if(DM_MSGS) INFO("DM: unpackSignalingTLV starting\n");
 
 	int offset = 0;
 	XMALLOC(m->tlv, sizeof(SignalingTLV));
@@ -1633,7 +1633,7 @@ unpackSignalingTLV(Octet *buf, MsgSignaling *m, PtpClock* ptpClock)
 void
 packSignalingTLV(SignalingTLV *tlv, Octet *buf)
 {
-    INFO("DM: packSignalingTLV\n");
+    if(DM_MSGS) INFO("DM: packSignalingTLV\n");
 
 	int offset = 0;
 	#define OPERATE( name, size, type ) \
@@ -1698,7 +1698,7 @@ unpackMsgSignaling(Octet *buf, MsgSignaling *m, PtpClock *ptpClock)
 void
 msgUnpackHeader(Octet * buf, MsgHeader * header)
 {
-    INFO("DM: msgUnpackHeader starting\n");
+    if(DM_MSGS) INFO("DM: msgUnpackHeader starting\n");
 
 	header->transportSpecific = (*(Nibble *) (buf + 0)) >> 4;
 	header->messageType = (*(Enumeration4 *) (buf + 0)) & 0x0F;
@@ -1778,7 +1778,7 @@ void addSecurityTLV(Octet *buf, PtpClock *ptpClock)
 
     // TODO get message length out from the header
     UInteger16  msg_len = flip16(*(UInteger16 *) (buf + 2));
-    INFO("DM: pulled out msg length: %d\n", msg_len);
+    if(DM_MSGS) INFO("DM: pulled out msg length: %d\n", msg_len);
     // DM: adjusting the header's message length field to account for sec TLV
     *(UInteger16 *) (buf + 2) = flip16(msg_len + SEC_TLV_IMM_HMACSHA256_LENGTH);
 
@@ -1803,7 +1803,7 @@ void addSecurityTLV(Octet *buf, PtpClock *ptpClock)
 
     unsigned char *static_digest;
 
-    INFO("DM: size of ICV: %d\n", sizeof(ICV));
+    if(DM_MSGS) INFO("DM: size of ICV: %d\n", sizeof(ICV));
 
     // want from header all the way up to ICV, so 44 for SYNCLENGTH, + TLV (26) - ICV (16)
     static_digest = dm_HMAC(dm_EVP_sha256(), key, key_len,
@@ -1822,7 +1822,7 @@ void addSecurityTLV(Octet *buf, PtpClock *ptpClock)
 void
 msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, PtpClock * ptpClock)
 {
-    INFO("DM: msgPackSync starting\n");
+    if(DM_MSGS) INFO("DM: msgPackSync starting\n");
 
 	msgPackHeader(buf, ptpClock);
 
@@ -1856,7 +1856,7 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
 void
 msgUnpackSync(Octet * buf, MsgSync * sync)
 {
-    INFO("DM: msgUnpackSync starting\n");
+    if(DM_MSGS) INFO("DM: msgUnpackSync starting\n");
 
 	sync->originTimestamp.secondsField.msb =
 		flip16(*(UInteger16 *) (buf + 34));
@@ -2271,7 +2271,7 @@ msgUnpackPdelayRespFollowUp(Octet * buf, MsgPdelayRespFollowUp * prespfollow)
 void
 msgPackManagementTLV(Octet *buf, MsgManagement *outgoing, PtpClock *ptpClock)
 {
-    INFO("DM: msgPackManagementTLV starting\n");
+    if(DM_MSGS) INFO("DM: msgPackManagementTLV starting\n");
 
         DBGV("packing ManagementTLV message \n");
 

@@ -199,7 +199,6 @@ void
 protocol(RunTimeOpts *rtOpts, PtpClock *ptpClock)
 {
 	DBG("event POWERUP\n");
-	INFO("DM: starting protocol\n");
 
 	timerStart(&ptpClock->timers[TIMINGDOMAIN_UPDATE_TIMER],timingDomain.updateInterval);
 	timerStart(&ptpClock->timers[ALARM_UPDATE_TIMER],ALARM_UPDATE_INTERVAL);
@@ -359,8 +358,6 @@ void setPortState(PtpClock *ptpClock, Enumeration8 state)
 void
 toState(UInteger8 state, const RunTimeOpts *rtOpts, PtpClock *ptpClock)
 {
-	INFO("DM: toState starting\n");
-
 	ptpClock->message_activity = TRUE;
 	
 	/* leaving state tasks */
@@ -1243,7 +1240,7 @@ void
 processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp, ssize_t length)
 {
 
-	INFO("DM: processMessage starting\n");
+    if(DM_MSGS) INFO("DM: processMessage starting\n");
 
     Boolean isFromSelf;
 
@@ -1279,7 +1276,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
     if (rtOpts->securityEnabled) {
         // check if security flag is set in the header
         if ((ptpClock->msgTmpHeader.flagField0 & 0x80) == 0x80) {
-			INFO("DM: security flag set on this message with flag0: %02x\n", ptpClock->msgTmpHeader.flagField0);
+            if(DM_MSGS) INFO("DM: security flag set on this message with flag0: %02x\n", ptpClock->msgTmpHeader.flagField0);
 
 			UInteger16 packetLength;
 
@@ -1327,16 +1324,16 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			// ICV gets truncated to 128 bits, so compare only 16 bytes
 			if (memcmp(static_digest, sec_tlv.icv.digest, sizeof(ICV))) {
 				ptpClock->counters.securityErrors++;
-				INFO("DM: icv's DIDNT MATCH on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+                if(DM_MSGS) INFO("DM: icv's DIDNT MATCH on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
 				return;
 			}
 
-			INFO("DM: icv's matched on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+            if(DM_MSGS) INFO("DM: icv's matched on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
 		}
 		else {
 			// security enabled, but message is missing security flag in header
 			ptpClock->counters.securityErrors++;
-			INFO("DM: security enabled, but message is missing security flag in header on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+            if(DM_MSGS) INFO("DM: security enabled, but message is missing security flag in header on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
 			return;
 		}
     }
@@ -3007,7 +3004,7 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
 static void
 issueSync(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 {
-	INFO("DM: issueSync starting\n");
+    if(DM_MSGS) INFO("DM: issueSync starting\n");
 	Integer32 dst = 0;
 	int i = 0;
 	UnicastGrantData *grant = NULL;
@@ -3108,7 +3105,7 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}
 
-    INFO("DM: packetlength for security enabled sync: %d\n", packetLength);
+    if(DM_MSGS) INFO("DM: packetlength for security enabled sync: %d\n", packetLength);
 
 	if (!netSendEvent(ptpClock->msgObuf,packetLength,&ptpClock->netPath,
 		rtOpts, dst, &internalTime)) {

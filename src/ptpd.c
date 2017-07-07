@@ -127,7 +127,6 @@ main(int argc, char **argv)
 	G_ptpClock = ptpClock;
 
 	/* do the protocol engine */
-	INFO("DM: in main, about to call protocol\n");
 	protocol(&rtOpts, ptpClock);
 	/* forever loop.. */
 

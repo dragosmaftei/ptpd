@@ -53,6 +53,7 @@
  */
 
 #include "ptpd.h"
+#include "datatypes.h"
 
 /**\brief Display an Integer64 type*/
 void
@@ -974,7 +975,8 @@ displayCounters(const PtpClock * ptpClock)
 		(unsigned long)ptpClock->counters.delayMechanismMismatchErrors);
 	INFO("           maxDelayDrops : %lu\n",
 		(unsigned long)ptpClock->counters.maxDelayDrops);
-
+	INFO("           securityErrors : %lu\n",
+		 (unsigned long)ptpClock->counters.securityErrors);
 
 #ifdef PTPD_STATISTICS
 	INFO("Outlier filter hits:\n");
