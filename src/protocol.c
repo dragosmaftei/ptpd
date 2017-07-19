@@ -54,6 +54,7 @@
 #include "ptpd.h"
 #include "ptp_datatypes.h"
 #include "datatypes.h"
+#include "dep/datatypes_dep.h"
 
 Boolean doInit(RunTimeOpts*,PtpClock*);
 static void doState(RunTimeOpts*,PtpClock*);
@@ -1448,6 +1449,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
     DBG("      ==> %s message received, sequence %d\n", getMessageTypeName(ptpClock->msgTmpHeader.messageType),
 							ptpClock->msgTmpHeader.sequenceId);
+	if(DM_MSGS) INFO("DM: processMessage timestamp (internal time) %us %dns\n",
+		 timeStamp->seconds, timeStamp->nanoseconds);
 
     /*
      *  on the table below, note that only the event messsages are passed the local time,
@@ -2079,8 +2082,12 @@ static void
 processSyncFromSelf(const TimeInternal * tint, const RunTimeOpts * rtOpts, PtpClock * ptpClock, Integer32 dst, const UInteger16 sequenceId) {
 	TimeInternal timestamp;
 	/*Add latency*/
+	if(DM_MSGS) INFO("DM: processSyncFromSelf timestamp (internal time) %us %dns\n",
+		 tint->seconds, tint->nanoseconds);
 	addTime(&timestamp, tint, &rtOpts->outboundLatency);
 	/* Issue follow-up CORRESPONDING TO THIS SYNC */
+	if(DM_MSGS) INFO("DM: processSyncFromSelf timestamp (timestamp) %us %dns\n",
+		 timestamp.seconds, timestamp.nanoseconds);
 	issueFollowup(&timestamp, rtOpts, ptpClock, dst, sequenceId);
 }
 #endif /* PTPD_SLAVE_ONLY */
@@ -2983,7 +2990,7 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
 
     if (rtOpts->securityEnabled) {
         // in dep/msg.c
-        addSecurityTLV(ptpClock->msgObuf, ptpClock);
+        addSecurityTLV(ptpClock->msgObuf, rtOpts);
         // DM: add size of sec tlv to the length of the packet to send
         packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
     }
@@ -3093,6 +3100,11 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 
 	now = internalTime;
 
+	if(DM_MSGS) INFO("DM: issueSyncSingle timestamp (internal time) %us %dns\n",
+		 internalTime.seconds, internalTime.nanoseconds);
+	if(DM_MSGS) INFO("DM: issueSyncSingle timestamp (timestamp) %us %dns\n",
+		 originTimestamp.secondsField, originTimestamp.nanosecondsField);
+
 	msgPackSync(ptpClock->msgObuf,*sequenceId,&originTimestamp,ptpClock);
 
 	// DM: use packetLength variable, add size of securityTLV if security is on
@@ -3100,7 +3112,7 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 
 	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
-		addSecurityTLV(ptpClock->msgObuf, ptpClock);
+		addSecurityTLV(ptpClock->msgObuf, rtOpts);
 		// DM: add size of sec tlv to the length of the packet to send
 		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}
@@ -3117,7 +3129,7 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 		DBGV("Sync MSG sent ! \n");
 
 #ifdef SO_TIMESTAMPING
-
+		if(DM_MSGS) INFO("DM: pcapEvent: %d, txTimestampFailure: %d\n", ptpClock->netPath.pcapEvent, ptpClock->netPath.txTimestampFailure);
 #ifdef PTPD_PCAP
 		if((ptpClock->netPath.pcapEvent == NULL) && !ptpClock->netPath.txTimestampFailure) {
 #else
@@ -3128,6 +3140,7 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 				if (respectUtcOffset(rtOpts, ptpClock) == TRUE) {
 					internalTime.seconds += ptpClock->timePropertiesDS.currentUtcOffset;
 				}
+				if(DM_MSGS) INFO("DM: processSyncFromSelf about to get called from issueSyncSingle\n");
 				processSyncFromSelf(&internalTime, rtOpts, ptpClock, dst, *sequenceId);
 			}
 		}
@@ -3176,7 +3189,7 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 
 	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
-		addSecurityTLV(ptpClock->msgObuf, ptpClock);
+		addSecurityTLV(ptpClock->msgObuf, rtOpts);
 		// DM: add size of sec tlv to the length of the packet to send
 		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}
@@ -3316,7 +3329,7 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 
 	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
-		addSecurityTLV(ptpClock->msgObuf, ptpClock);
+		addSecurityTLV(ptpClock->msgObuf, rtOpts);
 		// DM: add size of sec tlv to the length of the packet to send
 		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}
@@ -3380,7 +3393,7 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 
 	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
-		addSecurityTLV(ptpClock->msgObuf, ptpClock);
+		addSecurityTLV(ptpClock->msgObuf, rtOpts);
 		// DM: add size of sec tlv to the length of the packet to send
 		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}
@@ -3458,7 +3471,7 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 
 	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
-		addSecurityTLV(ptpClock->msgObuf, ptpClock);
+		addSecurityTLV(ptpClock->msgObuf, rtOpts);
 		// DM: add size of sec tlv to the length of the packet to send
 		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}

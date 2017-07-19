@@ -15,7 +15,7 @@
  * It defines functions which are not dependant of the operating system.
  */
 
-#define DM_MSGS 0
+#define DM_MSGS 1
 
 #ifndef PTPD_H_
 #define PTPD_H_

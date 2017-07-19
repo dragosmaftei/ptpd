@@ -210,6 +210,9 @@ typedef struct {
     Integer32 transportAddress;
 } SyncDestEntry;
 
+typedef struct {
+    char key[MAX_SECURITY_KEY_LEN];
+} SecurityOpts;
 
 /**
  * \struct RunTimeOpts
@@ -467,6 +470,7 @@ typedef struct {
 	Enumeration8 managementAclOrder;
 
 	Boolean securityEnabled;
+    SecurityOpts securityOpts;
 
 } RunTimeOpts;
 

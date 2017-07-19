@@ -958,8 +958,13 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 				);
 
     // DM: trying to add security as a config file switch; works... not sure about restart flags, using PTPD_RESTART_NONE for now
-    parseResult &= configMapBoolean(opCode, opArg, dict, target, "ptpengine:security", PTPD_RESTART_NONE, &rtOpts->securityEnabled, rtOpts->securityEnabled,
+    parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:enable", PTPD_RESTART_NONE, &rtOpts->securityEnabled, rtOpts->securityEnabled,
                                     "Enable experimental security feature using security TLV.");
+
+	parseResult &= configMapString(opCode, opArg, dict, target, "security:key",
+								   PTPD_RESTART_NONE, rtOpts->securityOpts.key, sizeof(rtOpts->securityOpts.key), rtOpts->securityOpts.key,
+								   "Key to use in ICV calculation (required if security is enabled).");
+
 
 
 	parseResult &= configMapBoolean(opCode, opArg, dict, target, "ptpengine:dot1as", PTPD_UPDATE_DATASETS, &rtOpts->dot1AS, rtOpts->dot1AS,

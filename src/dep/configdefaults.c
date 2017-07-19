@@ -443,8 +443,8 @@ loadDefaultSettings( RunTimeOpts* rtOpts )
 	rtOpts->syncSequenceChecking = FALSE;
 	rtOpts->clockUpdateTimeout = 0;
 
-    // no security extension by default
-    rtOpts->securityEnabled = FALSE;
+    /* no security extension by default; rtOpts memory set to 0 at start of function,
+     * so security defaults will be false, key all 0s */
 }
 
 /* The PtpEnginePreset structure for reference:

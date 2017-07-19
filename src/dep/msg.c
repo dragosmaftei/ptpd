@@ -54,6 +54,7 @@
 
 #include "../ptpd.h"
 #include "../ptp_datatypes.h"
+#include "../datatypes.h"
 
 extern RunTimeOpts rtOpts;
 
@@ -1771,12 +1772,12 @@ void msgPackSecurityTLV(SecurityTLV *data, Octet *buf)
  * this should be called after the buffer has been packed (including header) for the type of message
  * TODO need to consider whether this will work for all types of messages
  * */
-void addSecurityTLV(Octet *buf, PtpClock *ptpClock)
+void addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
 {
     // DM: adding security flag to the header
     *(UInteger8 *) (buf + 6) |= PTP_SECURITY;
 
-    // TODO get message length out from the header
+    // get message length out from the header
     UInteger16  msg_len = flip16(*(UInteger16 *) (buf + 2));
     if(DM_MSGS) INFO("DM: pulled out msg length: %d\n", msg_len);
     // DM: adjusting the header's message length field to account for sec TLV
@@ -1798,15 +1799,13 @@ void addSecurityTLV(Octet *buf, PtpClock *ptpClock)
     msgPackSecurityTLV(&sec_tlv, buf + msg_len);
 
     // calculate ICV from buffer, store it in the struct, then pack it in the buffer
-    int key_len = 32;
-    char *key = "12345678123456781234567812345678";
 
     unsigned char *static_digest;
 
-    if(DM_MSGS) INFO("DM: size of ICV: %d\n", sizeof(ICV));
+    if(DM_MSGS) INFO("DM: SECURITY ENABLED, key is: %s (strlen: %d)\n", rtOpts->securityOpts.key, strlen(rtOpts->securityOpts.key));
 
     // want from header all the way up to ICV, so 44 for SYNCLENGTH, + TLV (26) - ICV (16)
-    static_digest = dm_HMAC(dm_EVP_sha256(), key, key_len,
+    static_digest = dm_HMAC(dm_EVP_sha256(), rtOpts->securityOpts.key, strlen(rtOpts->securityOpts.key),
                             (unsigned char *) buf, msg_len + SEC_TLV_IMM_HMACSHA256_LENGTH - sizeof(ICV),
                             NULL, NULL);
 

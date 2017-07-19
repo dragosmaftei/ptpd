@@ -137,7 +137,6 @@ section 7.6.2.5, page 56:
 #define SIGNALING_LENGTH				44
 #define TLV_LENGTH					6
 #define TL_LENGTH					4
-#define SEC_TLV_IMM_HMACSHA256_LENGTH   26
 /** \}*/
 
 /*Enumeration defined in tables of the spec*/
@@ -468,5 +467,9 @@ enum {
 #define UNICAST_GRANT_REFRESH_INTERVAL 1
 #define GRANT_NOT_FOUND -1
 #define GRANT_NONE_LEFT -2
+
+/* DM: security constants */
+#define SEC_TLV_IMM_HMACSHA256_LENGTH   26
+#define MAX_SECURITY_KEY_LEN 64 // what should this be?
 
 #endif /*CONSTANTS_H_*/
