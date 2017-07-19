@@ -211,7 +211,7 @@ typedef struct {
 } SyncDestEntry;
 
 typedef struct {
-    char key[MAX_SECURITY_KEY_LEN];
+    char key[:MAX_SECURITY_KEY_LEN];
 } SecurityOpts;
 
 /**
