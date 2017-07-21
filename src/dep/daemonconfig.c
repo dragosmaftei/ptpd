@@ -817,6 +817,37 @@ findUnknownSettings(int opCode, dictionary* source, dictionary* dict)
     }
 }
 
+unsigned char tohex(unsigned char c)
+{
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
+    else
+        return -1;
+}
+
+void
+keyStringToBinary(unsigned char *keyString, unsigned char *key)
+{
+    for (int i = 0; i < MAX_SECURITY_KEY_LEN; i++) {
+        char first, second;
+        first = tohex(keyString[i * 2]);
+        second = tohex(keyString[i * 2 + 1]);
+        printf("i: %d, first: %c, 0x%02x, second: %c, 0x%02x\n", i, first, first, second, second);
+
+        if ((first == -1) || (second == -1)) {
+            printf("invalid hex character in specified key string; key will be zeroed out\n");
+            memset(key, 0, MAX_SECURITY_KEY_LEN);
+            return;
+        }
+        // multiplying by 16 shifts the hex value (4 bits) left 4 to make room for second
+        key[i] = first * 16 + second;
+    }
+}
+
 /*
  * IT HAPPENS HERE
  *
@@ -961,10 +992,21 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
     parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:enable", PTPD_RESTART_NONE, &rtOpts->securityEnabled, rtOpts->securityEnabled,
                                     "Enable experimental security feature using security TLV.");
 
+	// read the key in as ascii rep of hex values
 	parseResult &= configMapString(opCode, opArg, dict, target, "security:key",
-								   PTPD_RESTART_NONE, rtOpts->securityOpts.key, sizeof(rtOpts->securityOpts.key), rtOpts->securityOpts.key,
+								   PTPD_RESTART_NONE, rtOpts->securityOpts.keyString, sizeof(rtOpts->securityOpts.keyString), rtOpts->securityOpts.keyString,
 								   "Key to use in ICV calculation (required if security is enabled).");
 
+    if (rtOpts->securityEnabled) {
+        printf("DM: testing loading config with printf\n");
+        keyStringToBinary(rtOpts->securityOpts.keyString, rtOpts->securityOpts.key);
+    }
+
+    printf("the key is:\n\t");
+    for (int i = 0; i < 33; i++) {
+        printf("0x%02x ", rtOpts->securityOpts.key[i]);
+    }
+    printf("\n");
 
 
 	parseResult &= configMapBoolean(opCode, opArg, dict, target, "ptpengine:dot1as", PTPD_UPDATE_DATASETS, &rtOpts->dot1AS, rtOpts->dot1AS,

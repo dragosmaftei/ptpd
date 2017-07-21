@@ -470,6 +470,6 @@ enum {
 
 /* DM: security constants */
 #define SEC_TLV_IMM_HMACSHA256_LENGTH   26
-#define MAX_SECURITY_KEY_LEN 64 // what should this be?
+#define MAX_SECURITY_KEY_LEN 32 // what should this be?
 
 #endif /*CONSTANTS_H_*/

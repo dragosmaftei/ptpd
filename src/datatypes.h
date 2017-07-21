@@ -220,7 +220,10 @@ typedef struct {
     UInteger8 SPI;
     // supposed to identify the value of the currently used key (if GDOI/immediate)
     UInteger32 keyID;
-    char key[MAX_SECURITY_KEY_LEN];
+    unsigned char key[MAX_SECURITY_KEY_LEN + 1];
+	/* config file requires key in hex, read in as string initially, so for max key length
+	 * 32 bytes, need 64 chars (+2 for leading 0x ...?) and +1 for null byte */
+	unsigned char keyString[MAX_SECURITY_KEY_LEN * 2 + 1];
     // either 0x00 for immediate, or 0x04 for delayed
     Octet secParamIndicator;
     // disclosedKey (optional), only for delayed
