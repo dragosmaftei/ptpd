@@ -1325,6 +1325,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			// ICV gets truncated to 128 bits, so compare only 16 bytes
 			if (memcmp(static_digest, sec_tlv.icv.digest, sizeof(ICV))) {
 				ptpClock->counters.securityErrors++;
+				ptpClock->counters.mismatchICVErrors++;
                 if(DM_MSGS) INFO("DM: icv's DIDNT MATCH on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
 				return;
 			}
@@ -1334,7 +1335,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 		else {
 			// security enabled, but message is missing security flag in header
 			ptpClock->counters.securityErrors++;
-            if(DM_MSGS) INFO("DM: security enabled, but message is missing security flag in header on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+			ptpClock->counters.unsecuredMessageErrors++;
+            if(DM_MSGS) INFO("DM: security enabled, expecting secured messages, but message is missing security flag in header on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
 			return;
 		}
     }

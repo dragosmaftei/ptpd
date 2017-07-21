@@ -977,6 +977,10 @@ displayCounters(const PtpClock * ptpClock)
 		(unsigned long)ptpClock->counters.maxDelayDrops);
 	INFO("           securityErrors : %lu\n",
 		 (unsigned long)ptpClock->counters.securityErrors);
+	INFO("           mismatched ICVs errors : %lu\n",
+		 (unsigned long)ptpClock->counters.mismatchICVErrors);
+	INFO("           unsecured message errors : %lu\n",
+		 (unsigned long)ptpClock->counters.unsecuredMessageErrors);
 
 #ifdef PTPD_STATISTICS
 	INFO("Outlier filter hits:\n");

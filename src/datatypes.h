@@ -77,6 +77,8 @@ typedef struct
 	uint32_t delayMechanismMismatchErrors; /* P2P received, E2E expected or vice versa - incremets discarded */
 	uint32_t consecutiveSequenceErrors;    /* number of consecutive sequence mismatch errors */
     uint32_t securityErrors; /* icv didn't match... */
+	uint32_t mismatchICVErrors; /* failed icv verification; icvs didn't match */
+	uint32_t unsecuredMessageErrors; /* expected secure msg, but msg header didn't have security bit flipped */
 
 	/* unicast sgnaling counters */
 	uint32_t unicastGrantsRequested;  /* slave: how many we requested, master: how many requests we received */
@@ -210,8 +212,23 @@ typedef struct {
     Integer32 transportAddress;
 } SyncDestEntry;
 
+/* see dep/configdefaults.c loadDefaultSettings for currently hardcoded / default values */
 typedef struct {
-    char key[:MAX_SECURITY_KEY_LEN];
+    // length of overall securityTLV payload; depends on the key used and the security scheme (immediate vs delayed)
+    UInteger16 lengthField;
+    // security parameter index; enables querying the SAD for the relevant SA
+    UInteger8 SPI;
+    // supposed to identify the value of the currently used key (if GDOI/immediate)
+    UInteger32 keyID;
+    char key[MAX_SECURITY_KEY_LEN];
+    // either 0x00 for immediate, or 0x04 for delayed
+    Octet secParamIndicator;
+    // disclosedKey (optional), only for delayed
+    // sequenceNo (optional), not used
+    // reserved (optional), not used
+    /* IntegrityAlgTyp;
+     * the algorithm to use in ICV calc; determines ICV length and thus also total length (lengthField)
+     * specified in the form of an OID number */
 } SecurityOpts;
 
 /**

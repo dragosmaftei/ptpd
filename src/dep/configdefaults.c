@@ -33,6 +33,7 @@
  */
 
 #include "../ptpd.h"
+#include "../datatypes.h"
 
 #define CONFIG_ISTRUE(key) \
 	(iniparser_getboolean(dict,key,FALSE)==TRUE)
@@ -445,6 +446,11 @@ loadDefaultSettings( RunTimeOpts* rtOpts )
 
     /* no security extension by default; rtOpts memory set to 0 at start of function,
      * so security defaults will be false, key all 0s */
+
+    rtOpts->securityOpts.lengthField = SEC_TLV_IMM_HMACSHA256_LENGTH;
+    rtOpts->securityOpts.SPI = 0xab; // bogus value; not actually querying any SAD
+    rtOpts->securityOpts.keyID = 0x5678abcd; // bogus value; not actually using keyID to determine the key
+    rtOpts->securityOpts.secParamIndicator = 0x00; // 0x00 to indicate immediate, 0x04 to indicate delayed
 }
 
 /* The PtpEnginePreset structure for reference:

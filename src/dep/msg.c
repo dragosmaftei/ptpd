@@ -1787,10 +1787,10 @@ void addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
     // make TLV struct and populate it before packing the buffer
     SecurityTLV sec_tlv;
     sec_tlv.tlvType = SECURITY;
-    sec_tlv.lengthField = SEC_TLV_IMM_HMACSHA256_LENGTH;
-    sec_tlv.SPI = 0xab;
-    sec_tlv.keyID = 0x5678abcd;
-    sec_tlv.secParamIndicator = 0x00;
+    sec_tlv.lengthField = rtOpts->securityOpts.lengthField;
+    sec_tlv.SPI = rtOpts->securityOpts.SPI;
+    sec_tlv.keyID = rtOpts->securityOpts.keyID;
+    sec_tlv.secParamIndicator = rtOpts->securityOpts.secParamIndicator;
     // real ICV will be calculated from the buffer after it is packed
     memset(sec_tlv.icv.digest, 0, sizeof(ICV));
 
