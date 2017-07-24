@@ -497,6 +497,14 @@ typedef struct {
 
 } RunTimeOpts;
 
+// struct to measure extra processing time added by security processing
+typedef struct {
+    int numSyncMeasurements;
+    struct timespec syncTotals;
+
+    int numRecvMeasurements;
+    struct timespec recvTotals;
+} SecurityTiming;
 
 /**
  * \struct PtpClock
@@ -737,6 +745,7 @@ typedef struct {
 #endif
 
 	RunTimeOpts *rtOpts;
+    SecurityTiming securityTiming;
 
 } PtpClock;
 

@@ -981,6 +981,14 @@ displayCounters(const PtpClock * ptpClock)
 		 (unsigned long)ptpClock->counters.mismatchICVErrors);
 	INFO("           unsecured message errors : %lu\n",
 		 (unsigned long)ptpClock->counters.unsecuredMessageErrors);
+    INFO("           avg time added by sec processing on syncs (%d measurements) : %us%uns\n",
+         ptpClock->securityTiming.numSyncMeasurements,
+         ptpClock->securityTiming.syncTotals.tv_sec / ptpClock->securityTiming.numSyncMeasurements,
+         ptpClock->securityTiming.syncTotals.tv_nsec / ptpClock->securityTiming.numSyncMeasurements);
+    INFO("           avg time added by sec processing on recv messages (%d measurements) : %us%uns\n",
+         ptpClock->securityTiming.numRecvMeasurements,
+         ptpClock->securityTiming.recvTotals.tv_sec / ptpClock->securityTiming.numRecvMeasurements,
+         ptpClock->securityTiming.recvTotals.tv_nsec / ptpClock->securityTiming.numRecvMeasurements);
 
 #ifdef PTPD_STATISTICS
 	INFO("Outlier filter hits:\n");

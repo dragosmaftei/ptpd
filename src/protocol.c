@@ -1274,6 +1274,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
     msgUnpackHeader(ptpClock->msgIbuf, &ptpClock->msgTmpHeader);
 
+	// measure extra processing time added by the security processing
     struct timespec start, stop;
 
     if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
@@ -1345,7 +1346,10 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
     if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
         if(DM_MSGS) INFO("DM: get stop time in receive failed\n");
 
-    if(DM_MSGS) INFO("DM: time difference on receive: %us %uns\n", stop.tv_sec - start.tv_sec, stop.tv_nsec - start.tv_nsec);
+	ptpClock->securityTiming.numRecvMeasurements++;
+	ptpClock->securityTiming.recvTotals.tv_sec += stop.tv_sec - start.tv_sec;
+	ptpClock->securityTiming.recvTotals.tv_nsec += stop.tv_nsec - start.tv_nsec;
+	// done measuring security processing time
 
     /* packet is not from self, and is from a non-zero source address - check ACLs */
     if(ptpClock->netPath.lastSourceAddr &&
@@ -3133,7 +3137,9 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
 		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
 
-	if(DM_MSGS) INFO("DM: time difference on send sync: %us %uns\n", stop.tv_sec - start.tv_sec, stop.tv_nsec - start.tv_nsec);
+    ptpClock->securityTiming.numSyncMeasurements++;
+    ptpClock->securityTiming.syncTotals.tv_sec += stop.tv_sec - start.tv_sec;
+    ptpClock->securityTiming.syncTotals.tv_nsec += stop.tv_nsec - start.tv_nsec;
 
 	if(DM_MSGS) INFO("DM: packetlength for security enabled sync: %d\n", packetLength);
 
