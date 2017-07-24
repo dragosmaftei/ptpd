@@ -1310,14 +1310,10 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			// unpack starting from the sec TLV start, into the tlv struct
 			msgUnpackSecurityTLV(ptpClock->msgIbuf + packetLength, &sec_tlv, ptpClock);
 
-			// calculate ICV from buffer, compare
-			int key_len = 32;
-			char *key = "12345678123456781234567812345678";
-
 			unsigned char *static_digest;
 
 			// want from header all the way up to ICV, so packetlength, + TLV (26) - ICV (16)
-			static_digest = dm_HMAC(dm_EVP_sha256(), key, key_len,
+			static_digest = dm_HMAC(dm_EVP_sha256(), rtOpts->securityOpts.key, strlen(rtOpts->securityOpts.key),
 									(unsigned char *) ptpClock->msgIbuf,
 									packetLength + SEC_TLV_IMM_HMACSHA256_LENGTH - sizeof(ICV),
 									NULL, NULL);
