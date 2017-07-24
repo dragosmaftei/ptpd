@@ -1274,6 +1274,11 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
     msgUnpackHeader(ptpClock->msgIbuf, &ptpClock->msgTmpHeader);
 
+    struct timespec start, stop;
+
+    if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
+        if(DM_MSGS) INFO("DM: get start time in receive failed\n");
+
     if (rtOpts->securityEnabled) {
         // check if security flag is set in the header
         if ((ptpClock->msgTmpHeader.flagField0 & 0x80) == 0x80) {
@@ -1336,6 +1341,11 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			return;
 		}
     }
+
+    if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
+        if(DM_MSGS) INFO("DM: get stop time in receive failed\n");
+
+    if(DM_MSGS) INFO("DM: time difference on receive: %us %uns\n", stop.tv_sec - start.tv_sec, stop.tv_nsec - start.tv_nsec);
 
     /* packet is not from self, and is from a non-zero source address - check ACLs */
     if(ptpClock->netPath.lastSourceAddr &&
@@ -3108,6 +3118,11 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 	// DM: use packetLength variable, add size of securityTLV if security is on
 	UInteger16 packetLength = SYNC_LENGTH;
 
+	struct timespec start, stop;
+
+	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
+		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
+
 	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
 		addSecurityTLV(ptpClock->msgObuf, rtOpts);
@@ -3115,7 +3130,12 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}
 
-    if(DM_MSGS) INFO("DM: packetlength for security enabled sync: %d\n", packetLength);
+	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
+		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
+
+	if(DM_MSGS) INFO("DM: time difference on send sync: %us %uns\n", stop.tv_sec - start.tv_sec, stop.tv_nsec - start.tv_nsec);
+
+	if(DM_MSGS) INFO("DM: packetlength for security enabled sync: %d\n", packetLength);
 
 	if (!netSendEvent(ptpClock->msgObuf,packetLength,&ptpClock->netPath,
 		rtOpts, dst, &internalTime)) {

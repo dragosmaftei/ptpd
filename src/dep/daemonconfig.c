@@ -817,7 +817,7 @@ findUnknownSettings(int opCode, dictionary* source, dictionary* dict)
     }
 }
 
-unsigned char tohex(unsigned char c)
+int tohex(char c)
 {
     if (c >= '0' && c <= '9')
         return c - '0';
@@ -830,7 +830,7 @@ unsigned char tohex(unsigned char c)
 }
 
 void
-keyStringToBinary(unsigned char *keyString, unsigned char *key)
+keyStringToBinary(char *keyString, char *key)
 {
     for (int i = 0; i < MAX_SECURITY_KEY_LEN; i++) {
         char first, second;
@@ -997,16 +997,36 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 								   PTPD_RESTART_NONE, rtOpts->securityOpts.keyString, sizeof(rtOpts->securityOpts.keyString), rtOpts->securityOpts.keyString,
 								   "Key to use in ICV calculation (required if security is enabled).");
 
+    // SPI value in ascii rep of hex values
+    parseResult &= configMapString(opCode, opArg, dict, target, "security:spi",
+                                   PTPD_RESTART_NONE, rtOpts->securityOpts.SPIString, sizeof(rtOpts->securityOpts.SPIString), rtOpts->securityOpts.SPIString,
+                                   "1 byte SPI value");
+
+    // key id value in ascii rep of hex values
+    parseResult &= configMapString(opCode, opArg, dict, target, "security:key_id",
+                                   PTPD_RESTART_NONE, rtOpts->securityOpts.keyIDString, sizeof(rtOpts->securityOpts.keyIDString), rtOpts->securityOpts.keyIDString,
+                                   "4 byte key id value");
+
+    // security parameter indicator value in ascii rep of hex values
+    parseResult &= configMapString(opCode, opArg, dict, target, "security:sec_param_indicator",
+                                   PTPD_RESTART_NONE, rtOpts->securityOpts.secParamIndicatorString, sizeof(rtOpts->securityOpts.secParamIndicatorString),
+                                   rtOpts->securityOpts.secParamIndicatorString, "1 byte security parameter indicator");
+
     if (rtOpts->securityEnabled) {
         printf("DM: testing loading config with printf\n");
         keyStringToBinary(rtOpts->securityOpts.keyString, rtOpts->securityOpts.key);
+        rtOpts->securityOpts.SPI =  (UInteger8) strtoul(rtOpts->securityOpts.SPIString, 0, 16); // base 16
+        rtOpts->securityOpts.keyID =  (UInteger32) strtoul(rtOpts->securityOpts.keyIDString, 0, 16); // base 16
+        rtOpts->securityOpts.secParamIndicator =  (Octet) strtoul(rtOpts->securityOpts.secParamIndicatorString, 0, 16); // base 16
     }
 
     printf("the key is:\n\t");
     for (int i = 0; i < 33; i++) {
         printf("0x%02x ", rtOpts->securityOpts.key[i]);
     }
-    printf("\n");
+    printf("\nSPI: %02x\nkeyid: %08x\nsecparamind: %02x\n",
+           rtOpts->securityOpts.SPI, rtOpts->securityOpts.keyID, rtOpts->securityOpts.secParamIndicator);
+
 
 
 	parseResult &= configMapBoolean(opCode, opArg, dict, target, "ptpengine:dot1as", PTPD_UPDATE_DATASETS, &rtOpts->dot1AS, rtOpts->dot1AS,
