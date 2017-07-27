@@ -1779,7 +1779,7 @@ void addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
 
     // get message length out from the header
     UInteger16  msg_len = flip16(*(UInteger16 *) (buf + 2));
-    if(DM_MSGS) INFO("DM: pulled out msg length: %d\n", msg_len);
+//    if(DM_MSGS) INFO("DM: pulled out msg length: %d\n", msg_len);
     // DM: adjusting the header's message length field to account for sec TLV
     *(UInteger16 *) (buf + 2) = flip16(msg_len + SEC_TLV_IMM_HMACSHA256_LENGTH);
 
@@ -1802,7 +1802,7 @@ void addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
 
     unsigned char *static_digest;
 
-    if(DM_MSGS) INFO("DM: SECURITY ENABLED, key is: %s (strlen: %d)\n", rtOpts->securityOpts.key, strlen(rtOpts->securityOpts.key));
+//    if(DM_MSGS) INFO("DM: SECURITY ENABLED, key is: %s (strlen: %d)\n", rtOpts->securityOpts.key, strlen(rtOpts->securityOpts.key));
 
     // want from header all the way up to ICV, so 44 for SYNCLENGTH, + TLV (26) - ICV (16)
     static_digest = dm_HMAC(dm_EVP_sha256(), rtOpts->securityOpts.key, strlen(rtOpts->securityOpts.key),

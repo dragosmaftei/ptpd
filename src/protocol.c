@@ -1236,6 +1236,16 @@ timestampCorrection(const RunTimeOpts * rtOpts, PtpClock *ptpClock, TimeInternal
 
 }
 
+void
+recordTimingMeasurement(int *numMeasurements, struct timespec *totals, struct timespec *stop, struct timespec *start)
+{
+    // if we already got 50,000 measurements, that's good enough...
+    if (*numMeasurements < 50000) {
+        (*numMeasurements)++;
+        totals->tv_sec += stop->tv_sec - start->tv_sec;
+        totals->tv_nsec += stop->tv_nsec - start->tv_nsec;
+    }
+}
 
 void
 processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp, ssize_t length)
@@ -1281,9 +1291,9 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
         if(DM_MSGS) INFO("DM: get start time in receive failed\n");
 
     if (rtOpts->securityEnabled) {
-        // check if security flag is set in the header
+        // process security TLV only if security flag is set in the header (TODO check case where flag is set, but no TLV?)
         if ((ptpClock->msgTmpHeader.flagField0 & 0x80) == 0x80) {
-            if(DM_MSGS) INFO("DM: security flag set on this message with flag0: %02x\n", ptpClock->msgTmpHeader.flagField0);
+//            if(DM_MSGS) INFO("DM: security flag set on this message with flag0: %02x\n", ptpClock->msgTmpHeader.flagField0);
 
 			UInteger16 packetLength;
 
@@ -1332,10 +1342,12 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				return;
 			}
 
-            if(DM_MSGS) INFO("DM: icv's matched on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+//            if(DM_MSGS) INFO("DM: icv's matched on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
 		}
-		else {
-			// security enabled, but message is missing security flag in header
+        // we have security enabled, but message is missing security flag in header
+        else if ((!rtOpts->securityOpts.masterAcceptInsecure && !rtOpts->securityOpts.slaveAcceptInsecure) ||
+				(!rtOpts->securityOpts.masterAcceptInsecure && ptpClock->portDS.portState == PTP_MASTER) ||
+				(!rtOpts->securityOpts.slaveAcceptInsecure && ptpClock->portDS.portState == PTP_SLAVE)) {
 			ptpClock->counters.securityErrors++;
 			ptpClock->counters.unsecuredMessageErrors++;
             if(DM_MSGS) INFO("DM: security enabled, expecting secured messages, but message is missing security flag in header on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
@@ -1346,10 +1358,43 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
     if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
         if(DM_MSGS) INFO("DM: get stop time in receive failed\n");
 
-	ptpClock->securityTiming.numRecvMeasurements++;
-	ptpClock->securityTiming.recvTotals.tv_sec += stop.tv_sec - start.tv_sec;
-	ptpClock->securityTiming.recvTotals.tv_nsec += stop.tv_nsec - start.tv_nsec;
-	// done measuring security processing time
+	int *numRecvMeasurements;
+	struct timespec *recvTotals;
+
+	switch (ptpClock->msgTmpHeader.messageType) {
+		case ANNOUNCE:
+			numRecvMeasurements = &ptpClock->securityTiming.numRecvAnnounceMeasurements;
+			recvTotals = &ptpClock->securityTiming.recvAnnounceTotals;
+			break;
+		case SYNC:
+			numRecvMeasurements = &ptpClock->securityTiming.numRecvSyncMeasurements;
+			recvTotals = &ptpClock->securityTiming.recvSyncTotals;
+			break;
+		case FOLLOW_UP:
+			numRecvMeasurements = &ptpClock->securityTiming.numRecvFollowupMeasurements;
+			recvTotals = &ptpClock->securityTiming.recvFollowupTotals;
+			break;
+		case PDELAY_REQ:
+			numRecvMeasurements = &ptpClock->securityTiming.numRecvPdelayreqMeasurements;
+			recvTotals = &ptpClock->securityTiming.recvPdelayreqTotals;
+			break;
+		case PDELAY_RESP:
+			numRecvMeasurements = &ptpClock->securityTiming.numRecvPdelayrespMeasurements;
+			recvTotals = &ptpClock->securityTiming.recvPdelayrespTotals;
+			break;
+		case PDELAY_RESP_FOLLOW_UP:
+			numRecvMeasurements = &ptpClock->securityTiming.numRecvPdelayrespfollowupMeasurements;
+			recvTotals = &ptpClock->securityTiming.recvPdelayrespfollowupTotals;
+			break;
+		default:
+			numRecvMeasurements = 0;
+			recvTotals = 0;
+			break;
+	}
+
+    // this will increment the num measurements and add the current measurement to a running total
+    recordTimingMeasurement(numRecvMeasurements, recvTotals, &stop, &start);
+    // done measuring security processing time
 
     /* packet is not from self, and is from a non-zero source address - check ACLs */
     if(ptpClock->netPath.lastSourceAddr &&
@@ -3000,12 +3045,27 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
     // DM: use packetLength variable, add size of securityTLV if security is on
     UInteger16 packetLength = ANNOUNCE_LENGTH;
 
+
+	struct timespec start, stop;
+
+	// timing measurement of security processing
+	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
+		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
+
     if (rtOpts->securityEnabled) {
         // in dep/msg.c
         addSecurityTLV(ptpClock->msgObuf, rtOpts);
         // DM: add size of sec tlv to the length of the packet to send
         packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
     }
+
+	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
+		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
+
+	// this will increment the num measurements and add the current measurement to a running total
+	recordTimingMeasurement(&ptpClock->securityTiming.numAnnounceMeasurements, &ptpClock->securityTiming.announceTotals, &stop, &start);
+	// done measuring security processing time
+
 
 	if (!netSendGeneral(ptpClock->msgObuf,packetLength,
 			    &ptpClock->netPath, rtOpts, dst)) {
@@ -3124,6 +3184,7 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 
 	struct timespec start, stop;
 
+    // timing measurement of security processing
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
 		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
 
@@ -3137,9 +3198,9 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
 		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
 
-    ptpClock->securityTiming.numSyncMeasurements++;
-    ptpClock->securityTiming.syncTotals.tv_sec += stop.tv_sec - start.tv_sec;
-    ptpClock->securityTiming.syncTotals.tv_nsec += stop.tv_nsec - start.tv_nsec;
+    // this will increment the num measurements and add the current measurement to a running total
+    recordTimingMeasurement(&ptpClock->securityTiming.numSyncMeasurements, &ptpClock->securityTiming.syncTotals, &stop, &start);
+    // done measuring security processing time
 
 	if(DM_MSGS) INFO("DM: packetlength for security enabled sync: %d\n", packetLength);
 
@@ -3211,12 +3272,26 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 	// DM: use packetLength variable, add size of securityTLV if security is on
 	UInteger16 packetLength = FOLLOW_UP_LENGTH;
 
+	struct timespec start, stop;
+
+	// timing measurement of security processing
+	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
+		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
+
 	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
 		addSecurityTLV(ptpClock->msgObuf, rtOpts);
 		// DM: add size of sec tlv to the length of the packet to send
 		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}
+
+	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
+		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
+
+	// this will increment the num measurements and add the current measurement to a running total
+	recordTimingMeasurement(&ptpClock->securityTiming.numFollowupMeasurements, &ptpClock->securityTiming.followupTotals, &stop, &start);
+	// done measuring security processing time
+
 
 	if (!netSendGeneral(ptpClock->msgObuf,packetLength,
 			    &ptpClock->netPath, rtOpts, dst)) {
@@ -3351,12 +3426,27 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 	// DM: use packetLength variable, add size of securityTLV if security is on
 	UInteger16 packetLength = PDELAY_REQ_LENGTH;
 
+
+	struct timespec start, stop;
+
+	// timing measurement of security processing
+	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
+		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
+
 	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
 		addSecurityTLV(ptpClock->msgObuf, rtOpts);
 		// DM: add size of sec tlv to the length of the packet to send
 		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}
+
+	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
+		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
+
+	// this will increment the num measurements and add the current measurement to a running total
+	recordTimingMeasurement(&ptpClock->securityTiming.numPdelayreqMeasurements, &ptpClock->securityTiming.pdelayreqTotals, &stop, &start);
+	// done measuring security processing time
+
 
 	if (!netSendPeerEvent(ptpClock->msgObuf,packetLength,
 			      &ptpClock->netPath, rtOpts, dst, &internalTime)) {
@@ -3415,12 +3505,26 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 	// DM: use packetLength variable, add size of securityTLV if security is on
 	UInteger16 packetLength = PDELAY_RESP_LENGTH;
 
+	struct timespec start, stop;
+
+	// timing measurement of security processing
+	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
+		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
+
 	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
 		addSecurityTLV(ptpClock->msgObuf, rtOpts);
 		// DM: add size of sec tlv to the length of the packet to send
 		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}
+
+	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
+		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
+
+	// this will increment the num measurements and add the current measurement to a running total
+	recordTimingMeasurement(&ptpClock->securityTiming.numPdelayrespMeasurements, &ptpClock->securityTiming.pdelayrespTotals, &stop, &start);
+	// done measuring security processing time
+
 
 	if (!netSendPeerEvent(ptpClock->msgObuf,packetLength,
 			      &ptpClock->netPath, rtOpts, dst, &internalTime)) {
@@ -3493,12 +3597,26 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 	// DM: use packetLength variable, add size of securityTLV if security is on
 	UInteger16 packetLength = PDELAY_RESP_FOLLOW_UP_LENGTH;
 
+	struct timespec start, stop;
+
+	// timing measurement of security processing
+	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
+		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
+
 	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
 		addSecurityTLV(ptpClock->msgObuf, rtOpts);
 		// DM: add size of sec tlv to the length of the packet to send
 		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}
+
+	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
+		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
+
+	// this will increment the num measurements and add the current measurement to a running total
+	recordTimingMeasurement(&ptpClock->securityTiming.numPdelayrespfollowupMeasurements, &ptpClock->securityTiming.pdelayrespfollowupTotals, &stop, &start);
+	// done measuring security processing time
+
 
 	if (!netSendPeerGeneral(ptpClock->msgObuf, packetLength,
 				&ptpClock->netPath, rtOpts, dst)) {

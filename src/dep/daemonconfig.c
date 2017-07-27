@@ -1012,6 +1012,14 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
                                    PTPD_RESTART_NONE, rtOpts->securityOpts.secParamIndicatorString, sizeof(rtOpts->securityOpts.secParamIndicatorString),
                                    rtOpts->securityOpts.secParamIndicatorString, "1 byte security parameter indicator");
 
+    // when security is enabled and in master state, accept and process insecure messages (messages w/out security bit flipped)
+    parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:master_accept_insecure", PTPD_RESTART_NONE, &rtOpts->securityOpts.masterAcceptInsecure,
+                                    rtOpts->securityOpts.masterAcceptInsecure, "As master, accept and process incoming messages that are not secure.");
+
+    // when security is enabled and in slave state, accept and process insecure messages (messages w/out security bit flipped)
+    parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:slave_accept_insecure", PTPD_RESTART_NONE, &rtOpts->securityOpts.slaveAcceptInsecure,
+                                    rtOpts->securityOpts.slaveAcceptInsecure, "As slave, accept and process incoming messages that are not secure.");
+
     if (rtOpts->securityEnabled) {
         printf("DM: testing loading config with printf\n");
         keyStringToBinary(rtOpts->securityOpts.keyString, rtOpts->securityOpts.key);

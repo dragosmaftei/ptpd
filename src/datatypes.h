@@ -235,6 +235,10 @@ typedef struct {
     /* IntegrityAlgTyp;
      * the algorithm to use in ICV calc; determines ICV length and thus also total length (lengthField)
      * specified in the form of an OID number */
+
+    // process messages that are not secure i.e. don't have security bit flipped
+	Boolean masterAcceptInsecure;
+    Boolean slaveAcceptInsecure;
 } SecurityOpts;
 
 /**
@@ -499,11 +503,31 @@ typedef struct {
 
 // struct to measure extra processing time added by security processing
 typedef struct {
+    int numAnnounceMeasurements;
+    struct timespec announceTotals;
     int numSyncMeasurements;
     struct timespec syncTotals;
+    int numFollowupMeasurements;
+    struct timespec followupTotals;
+    int numPdelayreqMeasurements;
+    struct timespec pdelayreqTotals;
+    int numPdelayrespMeasurements;
+    struct timespec pdelayrespTotals;
+    int numPdelayrespfollowupMeasurements;
+    struct timespec pdelayrespfollowupTotals;
 
-    int numRecvMeasurements;
-    struct timespec recvTotals;
+	int numRecvAnnounceMeasurements;
+	struct timespec recvAnnounceTotals;
+	int numRecvSyncMeasurements;
+	struct timespec recvSyncTotals;
+	int numRecvFollowupMeasurements;
+	struct timespec recvFollowupTotals;
+	int numRecvPdelayreqMeasurements;
+	struct timespec recvPdelayreqTotals;
+	int numRecvPdelayrespMeasurements;
+	struct timespec recvPdelayrespTotals;
+	int numRecvPdelayrespfollowupMeasurements;
+	struct timespec recvPdelayrespfollowupTotals;
 } SecurityTiming;
 
 /**
