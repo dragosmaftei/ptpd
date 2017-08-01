@@ -471,5 +471,7 @@ enum {
 /* DM: security constants */
 #define SEC_TLV_IMM_HMACSHA256_LENGTH   26
 #define MAX_SECURITY_KEY_LEN 32 // what should this be?
+#define GDOI 0x00
+#define TESLA 0x04
 
 #endif /*CONSTANTS_H_*/

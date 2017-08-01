@@ -1326,6 +1326,17 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			// unpack starting from the sec TLV start, into the tlv struct
 			msgUnpackSecurityTLV(ptpClock->msgIbuf + packetLength, &sec_tlv, ptpClock);
 
+            // if delayed processing, save correction field and zero it out before calculating ICV
+            // fill it back in the buffer later
+            Integer64 correctionFieldTmp;
+            // should this check be from rtOpts or from the received message's TLV?
+            if (rtOpts->securityOpts.secParamIndicator == TESLA) {
+                memcpy(&correctionFieldTmp.msb, (ptpClock->msgIbuf + 8), 4);
+                memcpy(&correctionFieldTmp.lsb, (ptpClock->msgIbuf + 12), 4);
+                // don't need to flip the values copied into correctionFieldTmp since they won't be interpreted/used
+                memset(ptpClock->msgIbuf + 8, 0, 8); // zero out the correction field
+            }
+
 			unsigned char *static_digest;
 
 			// want from header all the way up to ICV, so packetlength, + TLV (26) - ICV (16)
@@ -1342,6 +1353,12 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				return;
 			}
 
+            // for TESLA, restore correctionField to its previous value before it was zeroed out (might not even be
+            // strictly necessary since the header information from msgIbuf was already pulled out into msgTmpHeader
+            if (rtOpts->securityOpts.secParamIndicator == TESLA) {
+                memcpy((ptpClock->msgIbuf + 8), &correctionFieldTmp.msb, 4);
+                memcpy((ptpClock->msgIbuf + 12), &correctionFieldTmp.lsb, 4);
+            }
 //            if(DM_MSGS) INFO("DM: icv's matched on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
 		}
         // we have security enabled, but message is missing security flag in header

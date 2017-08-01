@@ -1770,8 +1770,8 @@ void msgPackSecurityTLV(SecurityTLV *data, Octet *buf)
 /*
  * buf is the output buffer
  * this should be called after the buffer has been packed (including header) for the type of message
- * TODO need to consider whether this will work for all types of messages
- * */
+ *
+ */
 void addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
 {
     // DM: adding security flag to the header
@@ -1798,8 +1798,18 @@ void addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
     // start at end of sync message
     msgPackSecurityTLV(&sec_tlv, buf + msg_len);
 
-    // calculate ICV from buffer, store it in the struct, then pack it in the buffer
+    // if delayed processing, save correction field and zero it out before calculating ICV
+    // fill it back in the buffer later
+    Integer64 correctionFieldTmp;
 
+    if (rtOpts->securityOpts.secParamIndicator == TESLA) {
+        memcpy(&correctionFieldTmp.msb, (buf + 8), 4);
+        memcpy(&correctionFieldTmp.lsb, (buf + 12), 4);
+        // don't need to flip the values copied into correctionFieldTmp since they won't be interpreted/used
+        memset(buf + 8, 0, 8); // zero out the correction field
+    }
+
+    // calculate ICV from buffer, store it in the struct, then pack it in the buffer
     unsigned char *static_digest;
 
 //    if(DM_MSGS) INFO("DM: SECURITY ENABLED, key is: %s (strlen: %d)\n", rtOpts->securityOpts.key, strlen(rtOpts->securityOpts.key));
@@ -1814,6 +1824,12 @@ void addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
 
     // manually pack the ICV from the struct into the buffer
     memcpy(buf + msg_len + SEC_TLV_IMM_HMACSHA256_LENGTH - sizeof(ICV), sec_tlv.icv.digest, sizeof(ICV));
+
+    // for TESLA, restore correctionField to its previous value before it was zeroed out
+    if (rtOpts->securityOpts.secParamIndicator == TESLA) {
+        memcpy((buf + 8), &correctionFieldTmp.msb, 4);
+        memcpy((buf + 12), &correctionFieldTmp.lsb, 4);
+    }
 }
 
 #ifndef PTPD_SLAVE_ONLY
