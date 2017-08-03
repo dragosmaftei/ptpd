@@ -983,53 +983,77 @@ displayCounters(const PtpClock * ptpClock)
 		 (unsigned long)ptpClock->counters.unsecuredMessageErrors);
 	INFO("           avg time added by sec processing on announce (%d measurements) : %us%uns\n",
 		 ptpClock->securityTiming.numAnnounceMeasurements,
+		 (ptpClock->securityTiming.numAnnounceMeasurements == 0) ? 0:
 		 ptpClock->securityTiming.announceTotals.tv_sec / ptpClock->securityTiming.numAnnounceMeasurements,
+		 (ptpClock->securityTiming.numAnnounceMeasurements == 0) ? 0:
 		 ptpClock->securityTiming.announceTotals.tv_nsec / ptpClock->securityTiming.numAnnounceMeasurements);
     INFO("           avg time added by sec processing on syncs (%d measurements) : %us%uns\n",
          ptpClock->securityTiming.numSyncMeasurements,
+         (ptpClock->securityTiming.numSyncMeasurements == 0) ? 0:
          ptpClock->securityTiming.syncTotals.tv_sec / ptpClock->securityTiming.numSyncMeasurements,
+         (ptpClock->securityTiming.numSyncMeasurements == 0) ? 0:
          ptpClock->securityTiming.syncTotals.tv_nsec / ptpClock->securityTiming.numSyncMeasurements);
 	INFO("           avg time added by sec processing on followup (%d measurements) : %us%uns\n",
 		 ptpClock->securityTiming.numFollowupMeasurements,
+         (ptpClock->securityTiming.numFollowupMeasurements == 0) ? 0:
 		 ptpClock->securityTiming.followupTotals.tv_sec / ptpClock->securityTiming.numFollowupMeasurements,
-		 ptpClock->securityTiming.followupTotals.tv_nsec / ptpClock->securityTiming.numFollowupMeasurements);
+         (ptpClock->securityTiming.numFollowupMeasurements == 0) ? 0:
+         ptpClock->securityTiming.followupTotals.tv_nsec / ptpClock->securityTiming.numFollowupMeasurements);
 	INFO("           avg time added by sec processing on pdelayreq (%d measurements) : %us%uns\n",
 		 ptpClock->securityTiming.numPdelayreqMeasurements,
+         (ptpClock->securityTiming.numPdelayreqMeasurements == 0) ? 0:
 		 ptpClock->securityTiming.pdelayreqTotals.tv_sec / ptpClock->securityTiming.numPdelayreqMeasurements,
-		 ptpClock->securityTiming.pdelayreqTotals.tv_nsec / ptpClock->securityTiming.numPdelayreqMeasurements);
+         (ptpClock->securityTiming.numPdelayreqMeasurements == 0) ? 0:
+         ptpClock->securityTiming.pdelayreqTotals.tv_nsec / ptpClock->securityTiming.numPdelayreqMeasurements);
 	INFO("           avg time added by sec processing on pdelayresp (%d measurements) : %us%uns\n",
 		 ptpClock->securityTiming.numPdelayrespMeasurements,
+         (ptpClock->securityTiming.numPdelayrespMeasurements == 0) ? 0:
 		 ptpClock->securityTiming.pdelayrespTotals.tv_sec / ptpClock->securityTiming.numPdelayrespMeasurements,
-		 ptpClock->securityTiming.pdelayrespTotals.tv_nsec / ptpClock->securityTiming.numPdelayrespMeasurements);
+         (ptpClock->securityTiming.numPdelayrespMeasurements == 0) ? 0:
+         ptpClock->securityTiming.pdelayrespTotals.tv_nsec / ptpClock->securityTiming.numPdelayrespMeasurements);
 	INFO("           avg time added by sec processing on pdelayrespfollowup (%d measurements) : %us%uns\n",
 		 ptpClock->securityTiming.numPdelayrespfollowupMeasurements,
+         (ptpClock->securityTiming.numPdelayrespfollowupMeasurements == 0) ? 0:
 		 ptpClock->securityTiming.pdelayrespfollowupTotals.tv_sec / ptpClock->securityTiming.numPdelayrespfollowupMeasurements,
-		 ptpClock->securityTiming.pdelayrespfollowupTotals.tv_nsec / ptpClock->securityTiming.numPdelayrespfollowupMeasurements);
+         (ptpClock->securityTiming.numPdelayrespfollowupMeasurements == 0) ? 0:
+         ptpClock->securityTiming.pdelayrespfollowupTotals.tv_nsec / ptpClock->securityTiming.numPdelayrespfollowupMeasurements);
 
 	INFO("           avg time added by sec processing on RECV announce (%d measurements) : %us%uns\n",
 		 ptpClock->securityTiming.numRecvAnnounceMeasurements,
+         (ptpClock->securityTiming.numRecvAnnounceMeasurements == 0) ? 0:
 		 ptpClock->securityTiming.recvAnnounceTotals.tv_sec / ptpClock->securityTiming.numRecvAnnounceMeasurements,
-		 ptpClock->securityTiming.recvAnnounceTotals.tv_nsec / ptpClock->securityTiming.numRecvAnnounceMeasurements);
+         (ptpClock->securityTiming.numRecvAnnounceMeasurements == 0) ? 0:
+         ptpClock->securityTiming.recvAnnounceTotals.tv_nsec / ptpClock->securityTiming.numRecvAnnounceMeasurements);
 	INFO("           avg time added by sec processing on RECV syncs (%d measurements) : %us%uns\n",
 		 ptpClock->securityTiming.numRecvSyncMeasurements,
+         (ptpClock->securityTiming.numRecvSyncMeasurements == 0) ? 0:
 		 ptpClock->securityTiming.recvSyncTotals.tv_sec / ptpClock->securityTiming.numRecvSyncMeasurements,
-		 ptpClock->securityTiming.recvSyncTotals.tv_nsec / ptpClock->securityTiming.numRecvSyncMeasurements);
+         (ptpClock->securityTiming.numRecvSyncMeasurements == 0) ? 0:
+         ptpClock->securityTiming.recvSyncTotals.tv_nsec / ptpClock->securityTiming.numRecvSyncMeasurements);
 	INFO("           avg time added by sec processing on RECV followup (%d measurements) : %us%uns\n",
 		 ptpClock->securityTiming.numRecvFollowupMeasurements,
+         (ptpClock->securityTiming.numRecvFollowupMeasurements == 0) ? 0:
 		 ptpClock->securityTiming.recvFollowupTotals.tv_sec / ptpClock->securityTiming.numRecvFollowupMeasurements,
-		 ptpClock->securityTiming.recvFollowupTotals.tv_nsec / ptpClock->securityTiming.numRecvFollowupMeasurements);
+         (ptpClock->securityTiming.numRecvFollowupMeasurements == 0) ? 0:
+         ptpClock->securityTiming.recvFollowupTotals.tv_nsec / ptpClock->securityTiming.numRecvFollowupMeasurements);
 	INFO("           avg time added by sec processing on RECV pdelayreq (%d measurements) : %us%uns\n",
 		 ptpClock->securityTiming.numRecvPdelayreqMeasurements,
+         (ptpClock->securityTiming.numRecvPdelayreqMeasurements == 0) ? 0:
 		 ptpClock->securityTiming.recvPdelayreqTotals.tv_sec / ptpClock->securityTiming.numRecvPdelayreqMeasurements,
-		 ptpClock->securityTiming.recvPdelayreqTotals.tv_nsec / ptpClock->securityTiming.numRecvPdelayreqMeasurements);
+         (ptpClock->securityTiming.numRecvPdelayreqMeasurements == 0) ? 0:
+         ptpClock->securityTiming.recvPdelayreqTotals.tv_nsec / ptpClock->securityTiming.numRecvPdelayreqMeasurements);
 	INFO("           avg time added by sec processing on RECV pdelayresp (%d measurements) : %us%uns\n",
 		 ptpClock->securityTiming.numRecvPdelayrespMeasurements,
+         (ptpClock->securityTiming.numRecvPdelayrespMeasurements == 0) ? 0:
 		 ptpClock->securityTiming.recvPdelayrespTotals.tv_sec / ptpClock->securityTiming.numRecvPdelayrespMeasurements,
-		 ptpClock->securityTiming.recvPdelayrespTotals.tv_nsec / ptpClock->securityTiming.numRecvPdelayrespMeasurements);
+         (ptpClock->securityTiming.numRecvPdelayrespMeasurements == 0) ? 0:
+         ptpClock->securityTiming.recvPdelayrespTotals.tv_nsec / ptpClock->securityTiming.numRecvPdelayrespMeasurements);
 	INFO("           avg time added by sec processing on RECV pdelayrespfollowup (%d measurements) : %us%uns\n",
 		 ptpClock->securityTiming.numRecvPdelayrespfollowupMeasurements,
+         (ptpClock->securityTiming.numRecvPdelayrespfollowupMeasurements == 0) ? 0:
 		 ptpClock->securityTiming.recvPdelayrespfollowupTotals.tv_sec / ptpClock->securityTiming.numRecvPdelayrespfollowupMeasurements,
-		 ptpClock->securityTiming.recvPdelayrespfollowupTotals.tv_nsec / ptpClock->securityTiming.numRecvPdelayrespfollowupMeasurements);
+         (ptpClock->securityTiming.numRecvPdelayrespfollowupMeasurements == 0) ? 0:
+         ptpClock->securityTiming.recvPdelayrespfollowupTotals.tv_nsec / ptpClock->securityTiming.numRecvPdelayrespfollowupMeasurements);
 
 #ifdef PTPD_STATISTICS
 	INFO("Outlier filter hits:\n");
