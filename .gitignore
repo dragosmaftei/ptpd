@@ -37,3 +37,5 @@ ptpd*.tar.gz
 .idea
 # ignore Makefile.am so changes between linux and mac version remain
 /src/Makefile.am
+/test/pp_master.conf
+/test/pp_slave.conf
