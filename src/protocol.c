@@ -1237,14 +1237,107 @@ timestampCorrection(const RunTimeOpts * rtOpts, PtpClock *ptpClock, TimeInternal
 }
 
 void
-recordTimingMeasurement(int *numMeasurements, struct timespec *totals, struct timespec *stop, struct timespec *start)
+recordTimingMeasurement(PtpClock *ptpClock, Enumeration4Lower type, Boolean recv,
+                        struct timespec *stop, struct timespec *start)
 {
-    // if we already got 50,000 measurements, that's good enough...
-    if (*numMeasurements < 50000) {
-        (*numMeasurements)++;
-        totals->tv_sec += stop->tv_sec - start->tv_sec;
-        totals->tv_nsec += stop->tv_nsec - start->tv_nsec;
-    }
+	int *numMeasurements;
+	struct timespec *totals;
+    struct timespec *array;
+
+	INFO("DM: recordTimingMeasurement: type is: %02x\n", type);
+
+	switch (type) {
+		case ANNOUNCE:
+			if (recv) {
+				numMeasurements = &ptpClock->securityTiming.numRecvAnnounceMeasurements;
+				totals = &ptpClock->securityTiming.recvAnnounceTotals;
+                array = ptpClock->securityTiming.recvAnnounces;
+			} else {
+				numMeasurements = &ptpClock->securityTiming.numAnnounceMeasurements;
+				totals = &ptpClock->securityTiming.announceTotals;
+                array = ptpClock->securityTiming.announces;
+			}
+			break;
+		case SYNC:
+			if (recv) {
+				numMeasurements = &ptpClock->securityTiming.numRecvSyncMeasurements;
+				totals = &ptpClock->securityTiming.recvSyncTotals;
+                array = ptpClock->securityTiming.recvSyncs;
+			} else {
+				numMeasurements = &ptpClock->securityTiming.numSyncMeasurements;
+				totals = &ptpClock->securityTiming.syncTotals;
+                array = ptpClock->securityTiming.syncs;
+			}
+			break;
+		case FOLLOW_UP:
+			if (recv) {
+				numMeasurements = &ptpClock->securityTiming.numRecvFollowupMeasurements;
+				totals = &ptpClock->securityTiming.recvFollowupTotals;
+                array = ptpClock->securityTiming.recvFollowups;
+			} else {
+				numMeasurements = &ptpClock->securityTiming.numFollowupMeasurements;
+				totals = &ptpClock->securityTiming.followupTotals;
+                array = ptpClock->securityTiming.followups;
+			}
+			break;
+		case PDELAY_REQ:
+			if (recv) {
+				numMeasurements = &ptpClock->securityTiming.numRecvPdelayreqMeasurements;
+				totals = &ptpClock->securityTiming.recvPdelayreqTotals;
+                array = ptpClock->securityTiming.recvPdelayreqs;
+			} else {
+				numMeasurements = &ptpClock->securityTiming.numPdelayreqMeasurements;
+				totals = &ptpClock->securityTiming.pdelayreqTotals;
+                array = ptpClock->securityTiming.pdelayreqs;
+			}
+			break;
+		case PDELAY_RESP:
+			if (recv) {
+				numMeasurements = &ptpClock->securityTiming.numRecvPdelayrespMeasurements;
+				totals = &ptpClock->securityTiming.recvPdelayrespTotals;
+                array = ptpClock->securityTiming.recvPdelayresps;
+			} else {
+				numMeasurements = &ptpClock->securityTiming.numPdelayrespMeasurements;
+				totals = &ptpClock->securityTiming.pdelayrespTotals;
+                array = ptpClock->securityTiming.pdelayresps;
+			}
+			break;
+		case PDELAY_RESP_FOLLOW_UP:
+			if (recv) {
+				numMeasurements = &ptpClock->securityTiming.numRecvPdelayrespfollowupMeasurements;
+				totals = &ptpClock->securityTiming.recvPdelayrespfollowupTotals;
+                array = ptpClock->securityTiming.recvPdelayrespfollowups;
+			} else {
+				numMeasurements = &ptpClock->securityTiming.numPdelayrespfollowupMeasurements;
+				totals = &ptpClock->securityTiming.pdelayrespfollowupTotals;
+                array = ptpClock->securityTiming.pdelayrespfollowups;
+			}
+			break;
+		default:
+			return;
+	}
+
+	// if we already got 1,000 measurements, that's good enough...
+    if (*numMeasurements < 1000) {
+        struct timespec diff;
+        // if rollover, adjust (ex: 2.6 - 1.9)
+        if (stop->tv_nsec - start->tv_nsec < 0) {
+            diff.tv_sec = stop->tv_sec - start->tv_sec - 1;
+            diff.tv_nsec = stop->tv_nsec - start->tv_nsec + 1000000000;
+        }
+        // regular case
+        else {
+            diff.tv_sec = stop->tv_sec - start->tv_sec;
+            diff.tv_nsec = stop->tv_nsec - start->tv_nsec;
+        }
+        // store the diff in the array for later statistics if needed
+        array[*numMeasurements] = diff;
+        // also keep a running total to make getting an average easier
+        totals->tv_sec += diff.tv_sec;
+        totals->tv_nsec += diff.tv_nsec;
+
+		(*numMeasurements)++;
+	}
 }
 
 void
@@ -1375,42 +1468,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
     if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
         if(DM_MSGS) INFO("DM: get stop time in receive failed\n");
 
-	int *numRecvMeasurements;
-	struct timespec *recvTotals;
-
-	switch (ptpClock->msgTmpHeader.messageType) {
-		case ANNOUNCE:
-			numRecvMeasurements = &ptpClock->securityTiming.numRecvAnnounceMeasurements;
-			recvTotals = &ptpClock->securityTiming.recvAnnounceTotals;
-			break;
-		case SYNC:
-			numRecvMeasurements = &ptpClock->securityTiming.numRecvSyncMeasurements;
-			recvTotals = &ptpClock->securityTiming.recvSyncTotals;
-			break;
-		case FOLLOW_UP:
-			numRecvMeasurements = &ptpClock->securityTiming.numRecvFollowupMeasurements;
-			recvTotals = &ptpClock->securityTiming.recvFollowupTotals;
-			break;
-		case PDELAY_REQ:
-			numRecvMeasurements = &ptpClock->securityTiming.numRecvPdelayreqMeasurements;
-			recvTotals = &ptpClock->securityTiming.recvPdelayreqTotals;
-			break;
-		case PDELAY_RESP:
-			numRecvMeasurements = &ptpClock->securityTiming.numRecvPdelayrespMeasurements;
-			recvTotals = &ptpClock->securityTiming.recvPdelayrespTotals;
-			break;
-		case PDELAY_RESP_FOLLOW_UP:
-			numRecvMeasurements = &ptpClock->securityTiming.numRecvPdelayrespfollowupMeasurements;
-			recvTotals = &ptpClock->securityTiming.recvPdelayrespfollowupTotals;
-			break;
-		default:
-			numRecvMeasurements = 0;
-			recvTotals = 0;
-			break;
-	}
-
     // this will increment the num measurements and add the current measurement to a running total
-    recordTimingMeasurement(numRecvMeasurements, recvTotals, &stop, &start);
+    recordTimingMeasurement(ptpClock, ptpClock->msgTmpHeader.messageType, TRUE, &stop, &start);
     // done measuring security processing time
 
     /* packet is not from self, and is from a non-zero source address - check ACLs */
@@ -3080,9 +3139,8 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
 		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
 
 	// this will increment the num measurements and add the current measurement to a running total
-	recordTimingMeasurement(&ptpClock->securityTiming.numAnnounceMeasurements, &ptpClock->securityTiming.announceTotals, &stop, &start);
+	recordTimingMeasurement(ptpClock, ANNOUNCE, FALSE, &stop, &start);
 	// done measuring security processing time
-
 
 	if (!netSendGeneral(ptpClock->msgObuf,packetLength,
 			    &ptpClock->netPath, rtOpts, dst)) {
@@ -3216,7 +3274,7 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
 
     // this will increment the num measurements and add the current measurement to a running total
-    recordTimingMeasurement(&ptpClock->securityTiming.numSyncMeasurements, &ptpClock->securityTiming.syncTotals, &stop, &start);
+	recordTimingMeasurement(ptpClock, SYNC, FALSE, &stop, &start);
     // done measuring security processing time
 
 	if(DM_MSGS) INFO("DM: packetlength for security enabled sync: %d\n", packetLength);
@@ -3306,7 +3364,7 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
 
 	// this will increment the num measurements and add the current measurement to a running total
-	recordTimingMeasurement(&ptpClock->securityTiming.numFollowupMeasurements, &ptpClock->securityTiming.followupTotals, &stop, &start);
+	recordTimingMeasurement(ptpClock, FOLLOW_UP, FALSE, &stop, &start);
 	// done measuring security processing time
 
 
@@ -3461,7 +3519,7 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
 
 	// this will increment the num measurements and add the current measurement to a running total
-	recordTimingMeasurement(&ptpClock->securityTiming.numPdelayreqMeasurements, &ptpClock->securityTiming.pdelayreqTotals, &stop, &start);
+	recordTimingMeasurement(ptpClock, PDELAY_REQ, FALSE, &stop, &start);
 	// done measuring security processing time
 
 
@@ -3539,7 +3597,7 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
 
 	// this will increment the num measurements and add the current measurement to a running total
-	recordTimingMeasurement(&ptpClock->securityTiming.numPdelayrespMeasurements, &ptpClock->securityTiming.pdelayrespTotals, &stop, &start);
+	recordTimingMeasurement(ptpClock, PDELAY_RESP, FALSE, &stop, &start);
 	// done measuring security processing time
 
 
@@ -3631,7 +3689,7 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
 
 	// this will increment the num measurements and add the current measurement to a running total
-	recordTimingMeasurement(&ptpClock->securityTiming.numPdelayrespfollowupMeasurements, &ptpClock->securityTiming.pdelayrespfollowupTotals, &stop, &start);
+	recordTimingMeasurement(ptpClock, PDELAY_RESP_FOLLOW_UP, FALSE, &stop, &start);
 	// done measuring security processing time
 
 
