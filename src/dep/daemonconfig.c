@@ -1013,12 +1013,30 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
                                    rtOpts->securityOpts.secParamIndicatorString, "1 byte security parameter indicator");
 
     // when security is enabled and in master state, accept and process insecure messages (messages w/out security bit flipped)
-    parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:master_accept_insecure", PTPD_RESTART_NONE, &rtOpts->securityOpts.masterAcceptInsecure,
-                                    rtOpts->securityOpts.masterAcceptInsecure, "As master, accept and process incoming messages that are not secure.");
+    parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:master_accept_insecure_announce", PTPD_RESTART_NONE,
+									&rtOpts->securityOpts.masterAcceptInsecureAnnounce, rtOpts->securityOpts.masterAcceptInsecureAnnounce,
+									"As master, accept and process incoming announce messages that are not secure.");
+
+	parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:master_accept_insecure_sync_followup", PTPD_RESTART_NONE,
+									&rtOpts->securityOpts.masterAcceptInsecureSyncFollowup, rtOpts->securityOpts.masterAcceptInsecureSyncFollowup,
+									"As master, accept and process incoming sync & followup messages that are not secure.");
+
+	parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:master_accept_insecure_pdelays", PTPD_RESTART_NONE,
+									&rtOpts->securityOpts.masterAcceptInsecurePdelays, rtOpts->securityOpts.masterAcceptInsecurePdelays,
+									"As master, accept and process incoming pdelay messages that are not secure.");
 
     // when security is enabled and in slave state, accept and process insecure messages (messages w/out security bit flipped)
-    parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:slave_accept_insecure", PTPD_RESTART_NONE, &rtOpts->securityOpts.slaveAcceptInsecure,
-                                    rtOpts->securityOpts.slaveAcceptInsecure, "As slave, accept and process incoming messages that are not secure.");
+    parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:slave_accept_insecure_announce", PTPD_RESTART_NONE,
+									&rtOpts->securityOpts.slaveAcceptInsecureAnnounce, rtOpts->securityOpts.slaveAcceptInsecureAnnounce,
+									"As slave, accept and process incoming announce messages that are not secure.");
+
+	parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:slave_accept_insecure_sync_followup", PTPD_RESTART_NONE,
+									&rtOpts->securityOpts.slaveAcceptInsecureSyncFollowup, rtOpts->securityOpts.slaveAcceptInsecureSyncFollowup,
+									"As slave, accept and process incoming sync & followup messages that are not secure.");
+
+	parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:slave_accept_insecure_pdelays", PTPD_RESTART_NONE,
+									&rtOpts->securityOpts.slaveAcceptInsecurePdelays, rtOpts->securityOpts.slaveAcceptInsecurePdelays,
+									"As slave, accept and process incoming pdelay messages that are not secure.");
 
     if (rtOpts->securityEnabled) {
         printf("DM: testing loading config with printf\n");

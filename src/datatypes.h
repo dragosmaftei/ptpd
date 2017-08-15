@@ -237,8 +237,12 @@ typedef struct {
      * specified in the form of an OID number */
 
     // process messages that are not secure i.e. don't have security bit flipped
-	Boolean masterAcceptInsecure;
-    Boolean slaveAcceptInsecure;
+	Boolean masterAcceptInsecureAnnounce;
+	Boolean masterAcceptInsecureSyncFollowup;
+	Boolean masterAcceptInsecurePdelays;
+	Boolean slaveAcceptInsecureAnnounce;
+	Boolean slaveAcceptInsecureSyncFollowup;
+	Boolean slaveAcceptInsecurePdelays;
 } SecurityOpts;
 
 /**

@@ -9,7 +9,7 @@
  *                         Inaqui Delgado,
  *                         Rick Ratzel,
  *                         National Instruments.
- * Copyright (c) 2009-2010 George V. Neville-Neil,
+ * Copyright     (c) 2009-2010 George V. Neville-Neil,
  *                         Steven Kreuzer,
  *                         Martin Burnicki,
  *                         Jan Breuer,
@@ -1455,14 +1455,60 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 //            if(DM_MSGS) INFO("DM: icv's matched on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
 		}
         // we have security enabled, but message is missing security flag in header
-        else if ((!rtOpts->securityOpts.masterAcceptInsecure && !rtOpts->securityOpts.slaveAcceptInsecure) ||
-				(!rtOpts->securityOpts.masterAcceptInsecure && ptpClock->portDS.portState == PTP_MASTER) ||
-				(!rtOpts->securityOpts.slaveAcceptInsecure && ptpClock->portDS.portState == PTP_SLAVE)) {
-			ptpClock->counters.securityErrors++;
-			ptpClock->counters.unsecuredMessageErrors++;
-            if(DM_MSGS) INFO("DM: security enabled, expecting secured messages, but message is missing security flag in header on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
-			return;
-		}
+        else {
+            switch (ptpClock->msgTmpHeader.messageType) {
+                case ANNOUNCE:
+                    if ((!rtOpts->securityOpts.masterAcceptInsecureAnnounce && !rtOpts->securityOpts.slaveAcceptInsecureAnnounce) ||
+                        (!rtOpts->securityOpts.masterAcceptInsecureAnnounce && ptpClock->portDS.portState == PTP_MASTER) ||
+                        (!rtOpts->securityOpts.slaveAcceptInsecureAnnounce && ptpClock->portDS.portState == PTP_SLAVE)) {
+                        ptpClock->counters.securityErrors++;
+                        ptpClock->counters.unsecuredMessageErrors++;
+                        if (DM_MSGS)
+                            INFO("DM: security enabled, expecting secured announce messages, but message is missing security flag in header on seqid %04x\n",
+                                 ptpClock->msgTmpHeader.sequenceId);
+                        return;
+                    }
+                    // otherwise, break and continue processing
+                    break;
+                case SYNC:
+                    // just fall through to followup case
+                case FOLLOW_UP:
+                    // for both sync and followup messages
+                    if ((!rtOpts->securityOpts.masterAcceptInsecureSyncFollowup && !rtOpts->securityOpts.slaveAcceptInsecureSyncFollowup) ||
+                        (!rtOpts->securityOpts.masterAcceptInsecureSyncFollowup && ptpClock->portDS.portState == PTP_MASTER) ||
+                        (!rtOpts->securityOpts.slaveAcceptInsecureSyncFollowup && ptpClock->portDS.portState == PTP_SLAVE)) {
+                        ptpClock->counters.securityErrors++;
+                        ptpClock->counters.unsecuredMessageErrors++;
+                        if (DM_MSGS)
+                            INFO("DM: security enabled, expecting secured sync & followup messages, but message is missing security flag in header on seqid %04x\n",
+                                 ptpClock->msgTmpHeader.sequenceId);
+                        return;
+                    }
+                    // otherwise, break and continue processing
+                    break;
+                case PDELAY_REQ:
+                    // just fall through to pdelayrespfollowup case
+                case PDELAY_RESP:
+                    // just fall through to pdelayrespfollowup case
+                case PDELAY_RESP_FOLLOW_UP:
+                    // for all pdelay messages
+                    if ((!rtOpts->securityOpts.masterAcceptInsecurePdelays && !rtOpts->securityOpts.slaveAcceptInsecurePdelays) ||
+                        (!rtOpts->securityOpts.masterAcceptInsecurePdelays && ptpClock->portDS.portState == PTP_MASTER) ||
+                        (!rtOpts->securityOpts.slaveAcceptInsecurePdelays && ptpClock->portDS.portState == PTP_SLAVE)) {
+                        ptpClock->counters.securityErrors++;
+                        ptpClock->counters.unsecuredMessageErrors++;
+                        if (DM_MSGS)
+                            INFO("DM: security enabled, expecting secured sync & followup messages, but message is missing security flag in header on seqid %04x\n",
+                                 ptpClock->msgTmpHeader.sequenceId);
+                        return;
+                    }
+                    // otherwise, break and continue processing
+                    break;
+                default:
+                    // unrecognized message, will get taken care of later on below
+                    break;
+            }
+        }
     }
 
     if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
