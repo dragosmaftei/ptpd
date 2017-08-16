@@ -1038,6 +1038,11 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 									&rtOpts->securityOpts.slaveAcceptInsecurePdelays, rtOpts->securityOpts.slaveAcceptInsecurePdelays,
 									"As slave, accept and process incoming pdelay messages that are not secure.");
 
+	// if using GDOI (immediate security processing), ignore correction field in ICV calculation
+	parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:gdoi_ignore_correction", PTPD_RESTART_NONE,
+									&rtOpts->securityOpts.gdoiIgnoreCorrection, rtOpts->securityOpts.gdoiIgnoreCorrection,
+									"If using GDOI, ignore correction field in ICV calculation.");
+
     if (rtOpts->securityEnabled) {
         printf("DM: testing loading config with printf\n");
         keyStringToBinary(rtOpts->securityOpts.keyString, rtOpts->securityOpts.key);

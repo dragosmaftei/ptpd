@@ -1802,7 +1802,8 @@ void addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
     // fill it back in the buffer later
     Integer64 correctionFieldTmp;
 
-    if (rtOpts->securityOpts.secParamIndicator == TESLA) {
+    if (rtOpts->securityOpts.secParamIndicator == TESLA ||
+        (rtOpts->securityOpts.secParamIndicator == GDOI && rtOpts->securityOpts.gdoiIgnoreCorrection)) {
         memcpy(&correctionFieldTmp.msb, (buf + 8), 4);
         memcpy(&correctionFieldTmp.lsb, (buf + 12), 4);
         // don't need to flip the values copied into correctionFieldTmp since they won't be interpreted/used
@@ -1826,7 +1827,8 @@ void addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
     memcpy(buf + msg_len + SEC_TLV_IMM_HMACSHA256_LENGTH - sizeof(ICV), sec_tlv.icv.digest, sizeof(ICV));
 
     // for TESLA, restore correctionField to its previous value before it was zeroed out
-    if (rtOpts->securityOpts.secParamIndicator == TESLA) {
+    if (rtOpts->securityOpts.secParamIndicator == TESLA ||
+        (rtOpts->securityOpts.secParamIndicator == GDOI && rtOpts->securityOpts.gdoiIgnoreCorrection)) {
         memcpy((buf + 8), &correctionFieldTmp.msb, 4);
         memcpy((buf + 12), &correctionFieldTmp.lsb, 4);
     }

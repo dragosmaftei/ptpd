@@ -243,6 +243,9 @@ typedef struct {
 	Boolean slaveAcceptInsecureAnnounce;
 	Boolean slaveAcceptInsecureSyncFollowup;
 	Boolean slaveAcceptInsecurePdelays;
+
+    // ignore correction field in ICV calculation if using GDOI
+    Boolean gdoiIgnoreCorrection;
 } SecurityOpts;
 
 /**
