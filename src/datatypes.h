@@ -77,8 +77,8 @@ typedef struct
 	uint32_t delayMechanismMismatchErrors; /* P2P received, E2E expected or vice versa - incremets discarded */
 	uint32_t consecutiveSequenceErrors;    /* number of consecutive sequence mismatch errors */
     uint32_t securityErrors; /* icv didn't match... */
-	uint32_t mismatchICVErrors; /* failed icv verification; icvs didn't match */
-	uint32_t unsecuredMessageErrors; /* expected secure msg, but msg header didn't have security bit flipped */
+	uint32_t icvMismatchErrors; /* failed icv verification; icvs didn't match */
+	uint32_t securityTLVExpectedErrors; /* expected secure msg, but msg header didn't have security bit flipped */
 
 	/* unicast sgnaling counters */
 	uint32_t unicastGrantsRequested;  /* slave: how many we requested, master: how many requests we received */
