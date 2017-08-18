@@ -977,10 +977,10 @@ displayCounters(const PtpClock * ptpClock)
 		(unsigned long)ptpClock->counters.maxDelayDrops);
 	INFO("           securityErrors : %lu\n",
 		 (unsigned long)ptpClock->counters.securityErrors);
-	INFO("           mismatched ICVs errors : %lu\n",
-		 (unsigned long)ptpClock->counters.mismatchICVErrors);
-	INFO("           unsecured message errors : %lu\n",
-		 (unsigned long)ptpClock->counters.unsecuredMessageErrors);
+	INFO("           icvMismatchErrors : %lu\n",
+		 (unsigned long)ptpClock->counters.icvMismatchErrors);
+	INFO("           securityTLVExpectedErrors : %lu\n",
+		 (unsigned long)ptpClock->counters.securityTLVExpectedErrors);
 	INFO("           avg time added by sec processing on announce (%d measurements) : %us%uns\n",
 		 ptpClock->securityTiming.numAnnounceMeasurements,
 		 (ptpClock->securityTiming.numAnnounceMeasurements == 0) ? 0:

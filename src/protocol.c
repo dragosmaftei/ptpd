@@ -1442,7 +1442,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			// ICV gets truncated to 128 bits, so compare only 16 bytes
 			if (memcmp(static_digest, sec_tlv.icv.digest, sizeof(ICV))) {
 				ptpClock->counters.securityErrors++;
-				ptpClock->counters.mismatchICVErrors++;
+				ptpClock->counters.icvMismatchErrors++;
                 if(DM_MSGS) INFO("DM: icv's DIDNT MATCH on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
 				return;
 			}
@@ -1464,7 +1464,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                         (!rtOpts->securityOpts.masterAcceptInsecureAnnounce && ptpClock->portDS.portState == PTP_MASTER) ||
                         (!rtOpts->securityOpts.slaveAcceptInsecureAnnounce && ptpClock->portDS.portState == PTP_SLAVE)) {
                         ptpClock->counters.securityErrors++;
-                        ptpClock->counters.unsecuredMessageErrors++;
+                        ptpClock->counters.securityTLVExpectedErrors++;
                         if (DM_MSGS)
                             INFO("DM: security enabled, expecting secured announce messages, but message is missing security flag in header on seqid %04x\n",
                                  ptpClock->msgTmpHeader.sequenceId);
@@ -1480,7 +1480,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                         (!rtOpts->securityOpts.masterAcceptInsecureSyncFollowup && ptpClock->portDS.portState == PTP_MASTER) ||
                         (!rtOpts->securityOpts.slaveAcceptInsecureSyncFollowup && ptpClock->portDS.portState == PTP_SLAVE)) {
                         ptpClock->counters.securityErrors++;
-                        ptpClock->counters.unsecuredMessageErrors++;
+                        ptpClock->counters.securityTLVExpectedErrors++;
                         if (DM_MSGS)
                             INFO("DM: security enabled, expecting secured sync & followup messages, but message is missing security flag in header on seqid %04x\n",
                                  ptpClock->msgTmpHeader.sequenceId);
@@ -1498,7 +1498,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                         (!rtOpts->securityOpts.masterAcceptInsecurePdelays && ptpClock->portDS.portState == PTP_MASTER) ||
                         (!rtOpts->securityOpts.slaveAcceptInsecurePdelays && ptpClock->portDS.portState == PTP_SLAVE)) {
                         ptpClock->counters.securityErrors++;
-                        ptpClock->counters.unsecuredMessageErrors++;
+                        ptpClock->counters.securityTLVExpectedErrors++;
                         if (DM_MSGS)
                             INFO("DM: security enabled, expecting secured sync & followup messages, but message is missing security flag in header on seqid %04x\n",
                                  ptpClock->msgTmpHeader.sequenceId);

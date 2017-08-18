@@ -52,6 +52,7 @@
  */
 
 #include "../ptpd.h"
+#include "../datatypes.h"
 
 #ifdef HAVE_NETINET_ETHER_H
 #  include <netinet/ether.h>
@@ -1362,6 +1363,13 @@ else {
 	fprintf(out, 		STATUSPREFIX"  %lu\n","PTP Engine resets",
 		    (unsigned long)ptpClock->resetCount);
 
+	// DM: adding security errors to status file
+	fprintf(out, 		STATUSPREFIX"  %lu\n","Security errors",
+			(unsigned long)ptpClock->counters.securityErrors);
+	fprintf(out, 		STATUSPREFIX"  %lu\n","icvMismatchErrors",
+			(unsigned long)ptpClock->counters.icvMismatchErrors);
+	fprintf(out, 		STATUSPREFIX"  %lu\n","securityTLVExpectedErrors",
+			(unsigned long)ptpClock->counters.securityTLVExpectedErrors);
 
 	fflush(out);
 }
