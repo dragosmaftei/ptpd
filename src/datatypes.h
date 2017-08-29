@@ -214,7 +214,8 @@ typedef struct {
 
 /* see dep/configdefaults.c loadDefaultSettings for currently hardcoded / default values */
 typedef struct {
-    // length of overall securityTLV payload; depends on the key used and the security scheme (immediate vs delayed)
+    // length of overall securityTLV payload i.e. length of the 'value' field;
+    // depends on the key used and the security scheme (immediate vs delayed)
     UInteger16 lengthField;
     // security parameter index; enables querying the SAD for the relevant SA
     UInteger8 SPI;
