@@ -1051,6 +1051,12 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
         rtOpts->securityOpts.secParamIndicator =  (Octet) strtoul(rtOpts->securityOpts.secParamIndicatorString, 0, 16); // base 16
     }
 
+	// testing preproc
+#ifdef PTPD_SECURITY
+    printf("PTPD_SECURITY IS DEFINED\n");
+#endif /* PTPD_SECURITY */
+
+
     printf("the key is:\n\t");
     for (int i = 0; i < 33; i++) {
         printf("0x%02x ", rtOpts->securityOpts.key[i]);
