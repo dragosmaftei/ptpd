@@ -168,7 +168,9 @@
 
 #include "datatypes.h"
 
+#ifdef PTPD_SECURITY
 #include "dm_security.h"
+#endif /* PTPD_SECURITY */
 
 #ifdef PTPD_STATISTICS
 #include "dep/statistics.h"

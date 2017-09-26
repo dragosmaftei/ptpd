@@ -449,6 +449,7 @@ typedef struct {
 	Octet* valueField;
 } SignalingTLV;
 
+#ifdef PTPD_SECURITY
 // DM:  struct for ICV, used in the SecurityTLV definition
 typedef struct {
 	char digest[16];
@@ -460,6 +461,7 @@ typedef struct {
 	#include "def/securityTLV/securityTLV.def"
 
 } SecurityTLV;
+#endif /* PTPD_SECURITY */
 
 /**
  * \brief Signaling TLV Request Unicast Transmission fields (Table 73 of the spec)

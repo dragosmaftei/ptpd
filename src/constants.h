@@ -300,7 +300,9 @@ enum {
 	/* Optional alternate timescale TLV */
 	ALTERNATE_TIME_OFFSET_INDICATOR=0x0009,
 	/*Security TLVs */
+#ifdef PTPD_SECURITY
     SECURITY=0x000D,
+#endif /* PTPD_SECURITY */
 	AUTHENTICATION=0x2000,
 	AUTHENTICATION_CHALLENGE=0x2001,
 	SECURITY_ASSOCIATION_UPDATE=0x2002,
@@ -468,11 +470,13 @@ enum {
 #define GRANT_NOT_FOUND -1
 #define GRANT_NONE_LEFT -2
 
+#ifdef PTPD_SECURITY
 /* DM: security constants */
 #define SEC_TLV_IMM_HMACSHA256_LENGTH   26
 #define MAX_SECURITY_KEY_LEN 32 // what should this be?
 #define GDOI 0x00
 #define TESLA 0x04
 #define MAX_NUM_TIMING_MEASUREMENTS 1000
+#endif /* PTPD_SECURITY */
 
 #endif /*CONSTANTS_H_*/

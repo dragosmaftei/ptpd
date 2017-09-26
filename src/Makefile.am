@@ -5,9 +5,9 @@ lib_LTLIBRARIES = $(LIBPTPD2_LIBS_LA)
 sbin_PROGRAMS = ptpd2
 man_MANS = ptpd2.8 ptpd2.conf.5
 
-AM_CFLAGS	= $(SNMP_CFLAGS) $(PCAP_CFLAGS) -Wall -fexceptions -I/usr/local/opt/openssl/include
-AM_CPPFLAGS	= $(SNMP_CPPFLAGS) $(PCAP_CPPFLAGS)
-AM_LDFLAGS	= $(SNMP_LIBS) $(PCAP_LIBS) -lssl -lcrypto -L/usr/local/opt/openssl/lib
+AM_CFLAGS	= $(SNMP_CFLAGS) $(PCAP_CFLAGS) -Wall -fexceptions
+AM_CPPFLAGS	= $(SNMP_CPPFLAGS) $(PCAP_CPPFLAGS) $(SECURITY_CPPFLAGS)
+AM_LDFLAGS	= $(SNMP_LIBS) $(PCAP_LIBS) $(SECURITY_LIBS)
 
 if LINUX_KERNEL_HEADERS
 AM_CFLAGS += $(LINUX_KERNEL_INCLUDES)
@@ -65,8 +65,6 @@ ptpd2_SOURCES =				\
 	dep/alarms.c			\
 	ptpd.c				\
 	ptpd.h				\
-	dm_security.h       \
-	dm_security.c       \
 	$(NULL)
 
 # SNMP
@@ -87,6 +85,12 @@ if PTIMERS
 ptpd2_SOURCES +=dep/eventtimer_posix.c
 else
 ptpd2_SOURCES +=dep/eventtimer_itimer.c
+endif
+
+# SECURITY
+if SECURITY
+ptpd2_SOURCES +=dm_security.h
+ptpd2_SOURCES +=dm_security.c
 endif
 
 CSCOPE = cscope

@@ -975,6 +975,8 @@ displayCounters(const PtpClock * ptpClock)
 		(unsigned long)ptpClock->counters.delayMechanismMismatchErrors);
 	INFO("           maxDelayDrops : %lu\n",
 		(unsigned long)ptpClock->counters.maxDelayDrops);
+
+#ifdef PTPD_SECURITY
 	INFO("           securityErrors : %lu\n",
 		 (unsigned long)ptpClock->counters.securityErrors);
 	INFO("           icvMismatchErrors : %lu\n",
@@ -1054,6 +1056,7 @@ displayCounters(const PtpClock * ptpClock)
 		 ptpClock->securityTiming.recvPdelayrespfollowupTotals.tv_sec / ptpClock->securityTiming.numRecvPdelayrespfollowupMeasurements,
          (ptpClock->securityTiming.numRecvPdelayrespfollowupMeasurements == 0) ? 0:
          ptpClock->securityTiming.recvPdelayrespfollowupTotals.tv_nsec / ptpClock->securityTiming.numRecvPdelayrespfollowupMeasurements);
+#endif /* PTPD_SECURITY */
 
 #ifdef PTPD_STATISTICS
 	INFO("Outlier filter hits:\n");

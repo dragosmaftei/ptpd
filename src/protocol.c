@@ -1236,6 +1236,8 @@ timestampCorrection(const RunTimeOpts * rtOpts, PtpClock *ptpClock, TimeInternal
 
 }
 
+#ifdef PTPD_SECURITY
+/* function to facilitate measuring how long security processing takes */
 void
 recordTimingMeasurement(PtpClock *ptpClock, Enumeration4Lower type, Boolean recv,
                         struct timespec *stop, struct timespec *start)
@@ -1339,6 +1341,7 @@ recordTimingMeasurement(PtpClock *ptpClock, Enumeration4Lower type, Boolean recv
 		(*numMeasurements)++;
 	}
 }
+#endif /* PTPD_SECURITY */
 
 void
 processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp, ssize_t length)
@@ -1377,6 +1380,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
     msgUnpackHeader(ptpClock->msgIbuf, &ptpClock->msgTmpHeader);
 
+#ifdef PTPD_SECURITY
 	// measure extra processing time added by the security processing
     struct timespec start, stop;
 
@@ -1521,6 +1525,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
     // this will increment the num measurements and add the current measurement to a running total
     recordTimingMeasurement(ptpClock, ptpClock->msgTmpHeader.messageType, TRUE, &stop, &start);
     // done measuring security processing time
+#endif /* PTPD_SECURITY */
 
     /* packet is not from self, and is from a non-zero source address - check ACLs */
     if(ptpClock->netPath.lastSourceAddr &&
@@ -3171,7 +3176,7 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
     // DM: use packetLength variable, add size of securityTLV if security is on
     UInteger16 packetLength = ANNOUNCE_LENGTH;
 
-
+#ifdef PTPD_SECURITY
 	struct timespec start, stop;
 
 	// timing measurement of security processing
@@ -3191,6 +3196,7 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
 	// this will increment the num measurements and add the current measurement to a running total
 	recordTimingMeasurement(ptpClock, ANNOUNCE, FALSE, &stop, &start);
 	// done measuring security processing time
+#endif /* PTPD_SECURITY */
 
 	if (!netSendGeneral(ptpClock->msgObuf,packetLength,
 			    &ptpClock->netPath, rtOpts, dst)) {
@@ -3307,6 +3313,7 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 	// DM: use packetLength variable, add size of securityTLV if security is on
 	UInteger16 packetLength = SYNC_LENGTH;
 
+#ifdef PTPD_SECURITY
 	struct timespec start, stop;
 
     // timing measurement of security processing
@@ -3326,8 +3333,7 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
     // this will increment the num measurements and add the current measurement to a running total
 	recordTimingMeasurement(ptpClock, SYNC, FALSE, &stop, &start);
     // done measuring security processing time
-
-	if(DM_MSGS) INFO("DM: packetlength for security enabled sync: %d\n", packetLength);
+#endif /* PTPD_SECURITY */
 
 	if (!netSendEvent(ptpClock->msgObuf,packetLength,&ptpClock->netPath,
 		rtOpts, dst, &internalTime)) {
@@ -3397,6 +3403,7 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 	// DM: use packetLength variable, add size of securityTLV if security is on
 	UInteger16 packetLength = FOLLOW_UP_LENGTH;
 
+#ifdef PTPD_SECURITY
 	struct timespec start, stop;
 
 	// timing measurement of security processing
@@ -3416,7 +3423,7 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 	// this will increment the num measurements and add the current measurement to a running total
 	recordTimingMeasurement(ptpClock, FOLLOW_UP, FALSE, &stop, &start);
 	// done measuring security processing time
-
+#endif /* PTPD_SECURITY */
 
 	if (!netSendGeneral(ptpClock->msgObuf,packetLength,
 			    &ptpClock->netPath, rtOpts, dst)) {
@@ -3551,7 +3558,7 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 	// DM: use packetLength variable, add size of securityTLV if security is on
 	UInteger16 packetLength = PDELAY_REQ_LENGTH;
 
-
+#ifdef PTPD_SECURITY
 	struct timespec start, stop;
 
 	// timing measurement of security processing
@@ -3571,7 +3578,7 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 	// this will increment the num measurements and add the current measurement to a running total
 	recordTimingMeasurement(ptpClock, PDELAY_REQ, FALSE, &stop, &start);
 	// done measuring security processing time
-
+#endif /* PTPD_SECURITY */
 
 	if (!netSendPeerEvent(ptpClock->msgObuf,packetLength,
 			      &ptpClock->netPath, rtOpts, dst, &internalTime)) {
@@ -3630,6 +3637,7 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 	// DM: use packetLength variable, add size of securityTLV if security is on
 	UInteger16 packetLength = PDELAY_RESP_LENGTH;
 
+#ifdef PTPD_SECURITY
 	struct timespec start, stop;
 
 	// timing measurement of security processing
@@ -3649,7 +3657,7 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 	// this will increment the num measurements and add the current measurement to a running total
 	recordTimingMeasurement(ptpClock, PDELAY_RESP, FALSE, &stop, &start);
 	// done measuring security processing time
-
+#endif /* PTPD_SECURITY */
 
 	if (!netSendPeerEvent(ptpClock->msgObuf,packetLength,
 			      &ptpClock->netPath, rtOpts, dst, &internalTime)) {
@@ -3722,6 +3730,7 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 	// DM: use packetLength variable, add size of securityTLV if security is on
 	UInteger16 packetLength = PDELAY_RESP_FOLLOW_UP_LENGTH;
 
+#ifdef PTPD_SECURITY
 	struct timespec start, stop;
 
 	// timing measurement of security processing
@@ -3741,7 +3750,7 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 	// this will increment the num measurements and add the current measurement to a running total
 	recordTimingMeasurement(ptpClock, PDELAY_RESP_FOLLOW_UP, FALSE, &stop, &start);
 	// done measuring security processing time
-
+#endif /* PTPD_SECURITY */
 
 	if (!netSendPeerGeneral(ptpClock->msgObuf, packetLength,
 				&ptpClock->netPath, rtOpts, dst)) {

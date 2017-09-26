@@ -76,9 +76,12 @@ typedef struct
 	uint32_t sequenceMismatchErrors;  /* mismatched sequence IDs - also increments discarded */
 	uint32_t delayMechanismMismatchErrors; /* P2P received, E2E expected or vice versa - incremets discarded */
 	uint32_t consecutiveSequenceErrors;    /* number of consecutive sequence mismatch errors */
+
+#ifdef PTPD_SECURITY
     uint32_t securityErrors; /* icv didn't match... */
 	uint32_t icvMismatchErrors; /* failed icv verification; icvs didn't match */
 	uint32_t securityTLVExpectedErrors; /* expected secure msg, but msg header didn't have security bit flipped */
+#endif /* PTPD_SECURITY */
 
 	/* unicast sgnaling counters */
 	uint32_t unicastGrantsRequested;  /* slave: how many we requested, master: how many requests we received */
@@ -212,6 +215,7 @@ typedef struct {
     Integer32 transportAddress;
 } SyncDestEntry;
 
+#ifdef PTPD_SECURITY
 /* see dep/configdefaults.c loadDefaultSettings for currently hardcoded / default values */
 typedef struct {
     // length of overall securityTLV payload i.e. length of the 'value' field;
@@ -248,6 +252,7 @@ typedef struct {
     // ignore correction field in ICV calculation if using GDOI
     Boolean gdoiIgnoreCorrection;
 } SecurityOpts;
+#endif /* PTPD_SECURITY */
 
 /**
  * \struct RunTimeOpts
@@ -504,11 +509,13 @@ typedef struct {
 	Enumeration8 timingAclOrder;
 	Enumeration8 managementAclOrder;
 
+#ifdef PTPD_SECURITY
 	Boolean securityEnabled;
     SecurityOpts securityOpts;
-
+#endif /* PTPD_SECURITY */
 } RunTimeOpts;
 
+#ifdef PTPD_SECURITY
 // struct to measure extra processing time added by security processing
 typedef struct {
     int numAnnounceMeasurements;
@@ -549,6 +556,7 @@ typedef struct {
 	struct timespec recvPdelayrespfollowups[MAX_NUM_TIMING_MEASUREMENTS];
 	struct timespec recvPdelayrespfollowupTotals;
 } SecurityTiming;
+#endif /* PTPD_SECURITY */
 
 /**
  * \struct PtpClock
@@ -789,7 +797,10 @@ typedef struct {
 #endif
 
 	RunTimeOpts *rtOpts;
+
+#ifdef PTPD_SECURITY
     SecurityTiming securityTiming;
+#endif /* PTPD_SECURITY */
 
 } PtpClock;
 

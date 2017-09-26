@@ -779,9 +779,15 @@ AC_MSG_RESULT([$enable_security])
 case "$enable_security" in
  yes)
     PTP_SECURITY="-DPTPD_SECURITY"
+    SECURITY_CPPFLAGS="-I/usr/local/opt/openssl/include" # for macOS w/ openssl via homebrew
+    SECURITY_LIBS="-lssl -lcrypto -L/usr/local/opt/openssl/lib"
     ;;
 esac
 AC_SUBST(PTP_SECURITY)
+AC_SUBST(SECURITY_CPPFLAGS)
+AC_SUBST(SECURITY_LIBS)
+AM_CONDITIONAL([SECURITY], [test x$enable_security = xyes])
+
 
 
 AC_MSG_NOTICE([************************************************************])

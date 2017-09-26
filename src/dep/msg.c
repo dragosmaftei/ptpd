@@ -189,6 +189,7 @@ packInteger64( void* i, void *buf )
 	packUInteger32(&((Integer64*)i)->lsb, buf + 4);
 }
 
+#ifdef PTPD_SECURITY
 void
 packICV(void *icv, void *buf)
 {
@@ -201,6 +202,7 @@ unpackICV(void *buf, void *icv, PtpClock *ptpClock)
 {
     packICV(buf, icv);
 }
+#endif /* PTPD_SECURITY */
 
 /* NOTE: the unpack functions for management messages can probably be refactored into a macro */
 int
@@ -1744,6 +1746,8 @@ msgPackHeader(Octet * buf, PtpClock * ptpClock)
 	*(UInteger8 *) (buf + 33) = 0x7F;
 }
 
+#ifdef PTPD_SECURITY
+
 void
 msgUnpackSecurityTLV(Octet * buf, SecurityTLV *data, PtpClock *ptpClock)
 {
@@ -1833,6 +1837,8 @@ void addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
         memcpy((buf + 12), &correctionFieldTmp.lsb, 4);
     }
 }
+
+#endif /* PTPD_SECURITY */
 
 #ifndef PTPD_SLAVE_ONLY
 /*Pack SYNC message into OUT buffer of ptpClock*/

@@ -817,6 +817,7 @@ findUnknownSettings(int opCode, dictionary* source, dictionary* dict)
     }
 }
 
+#ifdef PTPD_SECURITY
 int tohex(char c)
 {
     if (c >= '0' && c <= '9')
@@ -847,6 +848,7 @@ keyStringToBinary(char *keyString, char *key)
         key[i] = first * 16 + second;
     }
 }
+#endif /* PTPD_SECURITY */
 
 /*
  * IT HAPPENS HERE
@@ -988,6 +990,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 				"ethernet", 	IEEE_802_3, NULL
 				);
 
+#ifdef PTPD_SECURITY
     // DM: trying to add security as a config file switch; works... not sure about restart flags, using PTPD_RESTART_NONE for now
     parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:enable", PTPD_RESTART_NONE, &rtOpts->securityEnabled, rtOpts->securityEnabled,
                                     "Enable experimental security feature using security TLV.");
@@ -1044,7 +1047,6 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 									"If using GDOI, ignore correction field in ICV calculation.");
 
     if (rtOpts->securityEnabled) {
-        printf("DM: testing loading config with printf\n");
         keyStringToBinary(rtOpts->securityOpts.keyString, rtOpts->securityOpts.key);
         rtOpts->securityOpts.SPI =  (UInteger8) strtoul(rtOpts->securityOpts.SPIString, 0, 16); // base 16
         rtOpts->securityOpts.keyID =  (UInteger32) strtoul(rtOpts->securityOpts.keyIDString, 0, 16); // base 16
@@ -1052,10 +1054,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
     }
 
 	// testing preproc
-#ifdef PTPD_SECURITY
     printf("PTPD_SECURITY IS DEFINED\n");
-#endif /* PTPD_SECURITY */
-
 
     printf("the key is:\n\t");
     for (int i = 0; i < 33; i++) {
@@ -1064,7 +1063,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
     printf("\nSPI: %02x\nkeyid: %08x\nsecparamind: %02x\n",
            rtOpts->securityOpts.SPI, rtOpts->securityOpts.keyID, rtOpts->securityOpts.secParamIndicator);
 
-
+#endif /* PTPD_SECURITY */
 
 	parseResult &= configMapBoolean(opCode, opArg, dict, target, "ptpengine:dot1as", PTPD_UPDATE_DATASETS, &rtOpts->dot1AS, rtOpts->dot1AS,
 		"Enable TransportSpecific field compatibility with 802.1AS / AVB (requires Ethernet transport)");
