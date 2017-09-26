@@ -764,6 +764,26 @@ esac
 AC_SUBST(PTP_SLAVE_ONLY)
 AM_CONDITIONAL([SLAVE_ONLY], [test x$enable_slave_only = xyes])
 
+# check for --enable-security option
+AC_MSG_CHECKING([if we're building with security])
+AC_ARG_ENABLE(
+    [security],
+    [AS_HELP_STRING(
+    [--enable-security (disabled by default)],
+    [Build a version with support for the experimental security mechanism]
+    )],
+    [],
+    [enable_security=no]
+)
+AC_MSG_RESULT([$enable_security])
+case "$enable_security" in
+ yes)
+    PTP_SECURITY="-DPTPD_SECURITY"
+    ;;
+esac
+AC_SUBST(PTP_SECURITY)
+
+
 AC_MSG_NOTICE([************************************************************])
 AC_MSG_NOTICE([*   END OF PTPD BUILD FLAG AND LIBRARY DEPENDENCY CHECKS   *])
 AC_MSG_NOTICE([************************************************************])
