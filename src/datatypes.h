@@ -515,7 +515,7 @@ typedef struct {
 #endif /* PTPD_SECURITY */
 } RunTimeOpts;
 
-#ifdef PTPD_SECURITY
+#if defined(PTPD_SECURITY) && defined(RUNTIME_DEBUG)
 // struct to measure extra processing time added by security processing
 typedef struct {
     int numAnnounceMeasurements;
@@ -556,7 +556,7 @@ typedef struct {
 	struct timespec recvPdelayrespfollowups[MAX_NUM_TIMING_MEASUREMENTS];
 	struct timespec recvPdelayrespfollowupTotals;
 } SecurityTiming;
-#endif /* PTPD_SECURITY */
+#endif /* PTPD_SECURITY & RUNTIME_DEBUG */
 
 /**
  * \struct PtpClock
@@ -798,9 +798,9 @@ typedef struct {
 
 	RunTimeOpts *rtOpts;
 
-#ifdef PTPD_SECURITY
+#if defined(PTPD_SECURITY) && defined(RUNTIME_DEBUG)
     SecurityTiming securityTiming;
-#endif /* PTPD_SECURITY */
+#endif /* PTPD_SECURITY & RUNTIME_DEBUG */
 
 } PtpClock;
 

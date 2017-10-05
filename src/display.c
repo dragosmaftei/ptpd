@@ -983,6 +983,8 @@ displayCounters(const PtpClock * ptpClock)
 		 (unsigned long)ptpClock->counters.icvMismatchErrors);
 	INFO("           securityTLVExpectedErrors : %lu\n",
 		 (unsigned long)ptpClock->counters.securityTLVExpectedErrors);
+
+#ifdef RUNTIME_DEBUG
 	INFO("           avg time added by sec processing on announce (%d measurements) : %us%uns\n",
 		 ptpClock->securityTiming.numAnnounceMeasurements,
 		 (ptpClock->securityTiming.numAnnounceMeasurements == 0) ? 0:
@@ -1056,6 +1058,7 @@ displayCounters(const PtpClock * ptpClock)
 		 ptpClock->securityTiming.recvPdelayrespfollowupTotals.tv_sec / ptpClock->securityTiming.numRecvPdelayrespfollowupMeasurements,
          (ptpClock->securityTiming.numRecvPdelayrespfollowupMeasurements == 0) ? 0:
          ptpClock->securityTiming.recvPdelayrespfollowupTotals.tv_nsec / ptpClock->securityTiming.numRecvPdelayrespfollowupMeasurements);
+#endif /* RUNTIME_DEBUG */
 #endif /* PTPD_SECURITY */
 
 #ifdef PTPD_STATISTICS

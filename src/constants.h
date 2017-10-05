@@ -476,7 +476,11 @@ enum {
 #define MAX_SECURITY_KEY_LEN 32 // what should this be?
 #define GDOI 0x00
 #define TESLA 0x04
+
+#ifdef RUNTIME_DEBUG
 #define MAX_NUM_TIMING_MEASUREMENTS 1000
+#endif /* RUNTIME_DEBUG */
+
 #endif /* PTPD_SECURITY */
 
 #endif /*CONSTANTS_H_*/

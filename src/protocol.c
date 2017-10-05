@@ -1236,7 +1236,7 @@ timestampCorrection(const RunTimeOpts * rtOpts, PtpClock *ptpClock, TimeInternal
 
 }
 
-#ifdef PTPD_SECURITY
+#if defined(PTPD_SECURITY) && defined(RUNTIME_DEBUG)
 /* function to facilitate measuring how long security processing takes */
 void
 recordTimingMeasurement(PtpClock *ptpClock, Enumeration4Lower type, Boolean recv,
@@ -1381,11 +1381,14 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
     msgUnpackHeader(ptpClock->msgIbuf, &ptpClock->msgTmpHeader);
 
 #ifdef PTPD_SECURITY
+
+#ifdef RUNTIME_DEBUG
 	// measure extra processing time added by the security processing
     struct timespec start, stop;
 
     if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
         if(DM_MSGS) INFO("DM: get start time in receive failed\n");
+#endif /* RUNTIME_DEBUG */
 
     if (rtOpts->securityEnabled) {
         // process security TLV only if security flag is set in the header
@@ -1519,12 +1522,15 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
         }
     }
 
+#ifdef RUNTIME_DEBUG
     if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
         if(DM_MSGS) INFO("DM: get stop time in receive failed\n");
 
     // this will increment the num measurements and add the current measurement to a running total
     recordTimingMeasurement(ptpClock, ptpClock->msgTmpHeader.messageType, TRUE, &stop, &start);
     // done measuring security processing time
+#endif /* RUNTIME_DEBUG */
+
 #endif /* PTPD_SECURITY */
 
     /* packet is not from self, and is from a non-zero source address - check ACLs */
@@ -3177,11 +3183,13 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
     UInteger16 packetLength = ANNOUNCE_LENGTH;
 
 #ifdef PTPD_SECURITY
+#ifdef RUNTIME_DEBUG
 	struct timespec start, stop;
 
 	// timing measurement of security processing
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
 		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
+#endif /* RUNTIME_DEBUG */
 
     if (rtOpts->securityEnabled) {
         // in dep/msg.c
@@ -3190,12 +3198,15 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
         packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
     }
 
+#ifdef RUNTIME_DEBUG
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
 		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
 
 	// this will increment the num measurements and add the current measurement to a running total
 	recordTimingMeasurement(ptpClock, ANNOUNCE, FALSE, &stop, &start);
 	// done measuring security processing time
+#endif /* RUNTIME_DEBUG */
+
 #endif /* PTPD_SECURITY */
 
 	if (!netSendGeneral(ptpClock->msgObuf,packetLength,
@@ -3314,11 +3325,14 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 	UInteger16 packetLength = SYNC_LENGTH;
 
 #ifdef PTPD_SECURITY
+
+#ifdef RUNTIME_DEBUG
 	struct timespec start, stop;
 
     // timing measurement of security processing
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
 		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
+#endif /* RUNTIME_DEBUG */
 
 	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
@@ -3327,12 +3341,15 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}
 
+#ifdef RUNTIME_DEBUG
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
 		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
 
     // this will increment the num measurements and add the current measurement to a running total
 	recordTimingMeasurement(ptpClock, SYNC, FALSE, &stop, &start);
     // done measuring security processing time
+#endif /* RUNTIME_DEBUG */
+
 #endif /* PTPD_SECURITY */
 
 	if (!netSendEvent(ptpClock->msgObuf,packetLength,&ptpClock->netPath,
@@ -3404,11 +3421,14 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 	UInteger16 packetLength = FOLLOW_UP_LENGTH;
 
 #ifdef PTPD_SECURITY
+
+#ifdef RUNTIME_DEBUG
 	struct timespec start, stop;
 
 	// timing measurement of security processing
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
 		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
+#endif /* RUNTIME_DEBUG */
 
 	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
@@ -3417,12 +3437,15 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}
 
+#ifdef RUNTIME_DEBUG
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
 		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
 
 	// this will increment the num measurements and add the current measurement to a running total
 	recordTimingMeasurement(ptpClock, FOLLOW_UP, FALSE, &stop, &start);
 	// done measuring security processing time
+#endif /* RUNTIME_DEBUG */
+
 #endif /* PTPD_SECURITY */
 
 	if (!netSendGeneral(ptpClock->msgObuf,packetLength,
@@ -3559,11 +3582,14 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 	UInteger16 packetLength = PDELAY_REQ_LENGTH;
 
 #ifdef PTPD_SECURITY
+
+#ifdef RUNTIME_DEBUG
 	struct timespec start, stop;
 
 	// timing measurement of security processing
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
 		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
+#endif /* RUNTIME_DEBUG */
 
 	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
@@ -3572,12 +3598,15 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}
 
+#ifdef RUNTIME_DEBUG
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
 		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
 
 	// this will increment the num measurements and add the current measurement to a running total
 	recordTimingMeasurement(ptpClock, PDELAY_REQ, FALSE, &stop, &start);
 	// done measuring security processing time
+#endif /* RUNTIME_DEBUG */
+
 #endif /* PTPD_SECURITY */
 
 	if (!netSendPeerEvent(ptpClock->msgObuf,packetLength,
@@ -3638,11 +3667,14 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 	UInteger16 packetLength = PDELAY_RESP_LENGTH;
 
 #ifdef PTPD_SECURITY
+
+#ifdef RUNTIME_DEBUG
 	struct timespec start, stop;
 
 	// timing measurement of security processing
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
 		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
+#endif /* RUNTIME_DEBUG */
 
 	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
@@ -3651,12 +3683,15 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}
 
+#ifdef RUNTIME_DEBUG
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
 		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
 
 	// this will increment the num measurements and add the current measurement to a running total
 	recordTimingMeasurement(ptpClock, PDELAY_RESP, FALSE, &stop, &start);
 	// done measuring security processing time
+#endif /* RUNTIME_DEBUG */
+
 #endif /* PTPD_SECURITY */
 
 	if (!netSendPeerEvent(ptpClock->msgObuf,packetLength,
@@ -3731,11 +3766,14 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 	UInteger16 packetLength = PDELAY_RESP_FOLLOW_UP_LENGTH;
 
 #ifdef PTPD_SECURITY
+
+#ifdef RUNTIME_DEBUG
 	struct timespec start, stop;
 
 	// timing measurement of security processing
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
 		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
+#endif /* RUNTIME_DEBUG */
 
 	if (rtOpts->securityEnabled) {
 		// in dep/msg.c
@@ -3744,12 +3782,15 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
 	}
 
+#ifdef RUNTIME_DEBUG
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
 		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
 
 	// this will increment the num measurements and add the current measurement to a running total
 	recordTimingMeasurement(ptpClock, PDELAY_RESP_FOLLOW_UP, FALSE, &stop, &start);
 	// done measuring security processing time
+#endif /* RUNTIME_DEBUG */
+
 #endif /* PTPD_SECURITY */
 
 	if (!netSendPeerGeneral(ptpClock->msgObuf, packetLength,
