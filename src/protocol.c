@@ -1392,7 +1392,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
     if (rtOpts->securityEnabled) {
         // process security TLV only if security flag is set in the header
-        if ((ptpClock->msgTmpHeader.flagField0 & 0x80) == 0x80) {
+        if ((ptpClock->msgTmpHeader.flagField0 & PTP_SECURITY) == PTP_SECURITY) {
 //            if(DM_MSGS) INFO("DM: security flag set on this message with flag0: %02x\n", ptpClock->msgTmpHeader.flagField0);
 
             // TODO check case where flag is set, but no TLV i.e. next 2 bytes aren't the expected 'Type'
