@@ -9,6 +9,8 @@
 * and enumeration defined in the spec
  */
 
+#define PTPD_SECURITY
+
 #define PTPD_PROGNAME "ptpd2"
 
 /* FIXME: make these parameterized, either through command-line options or make variables */

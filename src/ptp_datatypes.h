@@ -2,6 +2,7 @@
 #define PTP_DATATYPES_H_
 
 #include "ptp_primitives.h"
+#define PTPD_SECURITY
 
 /*Struct defined in spec*/
 
