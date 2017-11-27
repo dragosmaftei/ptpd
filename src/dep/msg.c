@@ -1820,7 +1820,7 @@ void addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
 //    if(DM_MSGS) INFO("DM: SECURITY ENABLED, key is: %s (strlen: %d)\n", rtOpts->securityOpts.key, strlen(rtOpts->securityOpts.key));
 
     // want from header all the way up to ICV, so 44 for SYNCLENGTH, + TLV (26) - ICV (16)
-    static_digest = dm_HMAC(dm_EVP_sha256(), rtOpts->securityOpts.key, strlen(rtOpts->securityOpts.key),
+    static_digest = dm_HMAC(dm_EVP_sha256(), rtOpts->securityOpts.key, rtOpts->securityOpts.keyLen,
                             (unsigned char *) buf, msg_len + SEC_TLV_IMM_HMACSHA256_LENGTH - sizeof(ICV),
                             NULL, NULL);
 

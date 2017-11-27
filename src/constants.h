@@ -9,7 +9,7 @@
 * and enumeration defined in the spec
  */
 
-#define PTPD_SECURITY
+//#define PTPD_SECURITY
 
 #define PTPD_PROGNAME "ptpd2"
 

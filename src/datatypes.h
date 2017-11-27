@@ -221,19 +221,26 @@ typedef struct {
     // length of overall securityTLV payload i.e. length of the 'value' field;
     // depends on the key used and the security scheme (immediate vs delayed)
     UInteger16 lengthField;
+
     // security parameter index; enables querying the SAD for the relevant SA
     UInteger8 SPI;
     char SPIString[1 * 2 + 1]; // size of SPI (1 byte) * 2 + 1 for null
+
     // supposed to identify the value of the currently used key (if GDOI/immediate)
     UInteger32 keyID;
     char keyIDString[4 * 2 + 1]; // size of keyID (4) * 2 + 1 for null
-    char key[MAX_SECURITY_KEY_LEN + 1];
+
+    int keyLen;
+
+    unsigned char key[MAX_SECURITY_KEY_LEN];
 	/* config file requires key in hex, read in as string initially, so for max key length
-	 * 32 bytes, need 64 chars (+2 for leading 0x ...?) and +1 for null byte */
+	 * 32 bytes, need 64 chars and +1 for null byte */
 	char keyString[MAX_SECURITY_KEY_LEN * 2 + 1];
+
     // either 0x00 for immediate, or 0x04 for delayed
     Octet secParamIndicator;
     char secParamIndicatorString[1 * 2 + 1]; // size of secParamIndicator * 2 + 1 for null
+
     // disclosedKey (optional), only for delayed
     // sequenceNo (optional), not used
     // reserved (optional), not used

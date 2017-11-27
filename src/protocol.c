@@ -1443,7 +1443,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			unsigned char *static_digest;
 
 			// want from header all the way up to ICV, so packetlength, + TLV (26) - ICV (16)
-			static_digest = dm_HMAC(dm_EVP_sha256(), rtOpts->securityOpts.key, strlen(rtOpts->securityOpts.key),
+			static_digest = dm_HMAC(dm_EVP_sha256(), rtOpts->securityOpts.key, rtOpts->securityOpts.keyLen,
 									(unsigned char *) ptpClock->msgIbuf,
 									packetLength + SEC_TLV_IMM_HMACSHA256_LENGTH - sizeof(ICV),
 									NULL, NULL);

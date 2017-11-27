@@ -818,7 +818,7 @@ findUnknownSettings(int opCode, dictionary* source, dictionary* dict)
 }
 
 #ifdef PTPD_SECURITY
-int tohex(char c)
+int tohex(unsigned char c)
 {
     if (c >= '0' && c <= '9')
         return c - '0';
@@ -831,13 +831,14 @@ int tohex(char c)
 }
 
 void
-keyStringToBinary(char *keyString, char *key)
+keyStringToBinary(char *keyString, unsigned char *key)
 {
-    for (int i = 0; i < MAX_SECURITY_KEY_LEN; i++) {
+    // keyString length will be double the key length, so run loop half that many times
+    for (int i = 0; i < strlen(keyString) / 2; i++) {
         char first, second;
         first = tohex(keyString[i * 2]);
         second = tohex(keyString[i * 2 + 1]);
-        printf("i: %d, first: %c, 0x%02x, second: %c, 0x%02x\n", i, first, first, second, second);
+        printf("i: %d, first: 0x%01x, second: 0x%01x\n", i, first, second);
 
         if ((first == -1) || (second == -1)) {
             printf("invalid hex character in specified key string; key will be zeroed out\n");
@@ -990,8 +991,9 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 				"ethernet", 	IEEE_802_3, NULL
 				);
 
+
 #ifdef PTPD_SECURITY
-    // DM: trying to add security as a config file switch; works... not sure about restart flags, using PTPD_RESTART_NONE for now
+    // DM: security enabled config file switch; not sure about restart flags, using PTPD_RESTART_NONE for now
     parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:enable", PTPD_RESTART_NONE, &rtOpts->securityEnabled, rtOpts->securityEnabled,
                                     "Enable experimental security feature using security TLV.");
 
@@ -1046,17 +1048,27 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 									&rtOpts->securityOpts.gdoiIgnoreCorrection, rtOpts->securityOpts.gdoiIgnoreCorrection,
 									"If using GDOI, ignore correction field in ICV calculation.");
 
+
+    printf("the keystring size is (should always be this): %lu\n", sizeof(rtOpts->securityOpts.keyString));
+    printf("the keystring STRLEN is: %lu\n", strlen(rtOpts->securityOpts.keyString));
+    printf("the keyString is:\n\t");
+    for (int i = 0; i < (sizeof(rtOpts->securityOpts.keyString) + 1); i++)
+        printf("0x%02x ", rtOpts->securityOpts.keyString[i]);
+
     if (rtOpts->securityEnabled) {
         keyStringToBinary(rtOpts->securityOpts.keyString, rtOpts->securityOpts.key);
         rtOpts->securityOpts.SPI =  (UInteger8) strtoul(rtOpts->securityOpts.SPIString, 0, 16); // base 16
         rtOpts->securityOpts.keyID =  (UInteger32) strtoul(rtOpts->securityOpts.keyIDString, 0, 16); // base 16
         rtOpts->securityOpts.secParamIndicator =  (Octet) strtoul(rtOpts->securityOpts.secParamIndicatorString, 0, 16); // base 16
+
+        // set the key length based on the inputted key string from the config file
+        rtOpts->securityOpts.keyLen = strlen(rtOpts->securityOpts.keyString) / 2;
     }
 
 	// testing preproc
     printf("PTPD_SECURITY IS DEFINED\n");
 
-    printf("the key is:\n\t");
+    printf("the key is (length: %d):\n\t", rtOpts->securityOpts.keyLen);
     for (int i = 0; i < 33; i++) {
         printf("0x%02x ", rtOpts->securityOpts.key[i]);
     }
