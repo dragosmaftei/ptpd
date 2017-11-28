@@ -451,14 +451,11 @@ typedef struct {
 } SignalingTLV;
 
 #ifdef PTPD_SECURITY
-// DM:  struct for ICV, used in the SecurityTLV definition
-typedef struct {
-	char digest[16];
-} ICV;
 
 /* Security TLV struct */
 typedef struct {
 	#define OPERATE( name, size, type) type name;
+	// doesn't include variable length fields (optional fields, and ICV)
 	#include "def/securityTLV/securityTLV.def"
 
 } SecurityTLV;

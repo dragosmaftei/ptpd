@@ -474,13 +474,13 @@ enum {
 
 #ifdef PTPD_SECURITY
 /* DM: security constants */
-#define SEC_TLV_IMM_HMACSHA256_LENGTH   26
+#define SEC_TLV_IMM_HMACSHA256_LEN 26
+// length of sec TLV including only constant fields (not including optional fields or ICV)
+#define SEC_TLV_CONSTANT_LEN 10
 #define MAX_SEC_KEY_LEN 32 // 32 for HMAC, 16 for GMAC
 
-#define SPI_DISCLOSED_KEY 0x04 // security parameter indicator disclosed key
-// TODO get rid of these in favor of SPI_DISCLOSED_KEY
-#define GDOI 0x00
-#define TESLA 0x04
+// security parameter indicator indicating presence of disclosed key (delayed processing only)
+#define SPI_DISCLOSED_KEY 0x04
 
 /*
 OIDs are represented in dot format, and encoded on the wire in a TLV (1 byte for type and length each)
@@ -489,7 +489,9 @@ online corverter: https://misc.daniel-marschall.de/asn.1/oid-converter/online.ph
 they will be stored here in the TLV format, type is 0x06 for absolute (as opposed to 0x0d relative)
 ex: HMAC-SHA-256: 1.2.840.113549.2.9 => 06 08 2A 86 48 86 F7 0D 02 09
 */
-#define HMAC_OID "\x06\x08\x2a\x86\x48\x86\xf7\x0d\x02\x09"
+#define HMAC_SHA256_OID "\x06\x08\x2a\x86\x48\x86\xf7\x0d\x02\x09"
+// this OID doesn't specify which aes algorithm / cipher to use (aes128, aes192, aes256)
+// the choice of cipher determines key size; using aes256 to match with key size used in HMAC-SHA256
 #define GMAC_OID "\x06\x05\x28\xcc\x45\x03\x04"
 #define MAX_OID_LEN 32 // 32 bytes should be more than plenty
 

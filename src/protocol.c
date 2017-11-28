@@ -1425,15 +1425,15 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
 			SecurityTLV sec_tlv;
 
-			// unpack starting from the sec TLV start, into the tlv struct
+			// unpack starting from the sec TLV start, into the tlv struct (this will be just constant fields, not ICV)
 			msgUnpackSecurityTLV(ptpClock->msgIbuf + packetLength, &sec_tlv, ptpClock);
 
             // if delayed processing, save correction field and zero it out before calculating ICV
             // fill it back in the buffer later
             Integer64 correctionFieldTmp;
             // should this check be from rtOpts or from the received message's TLV?
-            if (rtOpts->securityOpts.secParamIndicator == TESLA ||
-                (rtOpts->securityOpts.secParamIndicator == GDOI && rtOpts->securityOpts.immIgnoreCorrection)) {
+            if (rtOpts->securityOpts.delayed ||
+                (!rtOpts->securityOpts.delayed && rtOpts->securityOpts.immIgnoreCorrection)) {
                 memcpy(&correctionFieldTmp.msb, (ptpClock->msgIbuf + 8), 4);
                 memcpy(&correctionFieldTmp.lsb, (ptpClock->msgIbuf + 12), 4);
                 // don't need to flip the values copied into correctionFieldTmp since they won't be interpreted/used
@@ -1445,11 +1445,13 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			// want from header all the way up to ICV, so packetlength, + TLV (26) - ICV (16)
 			static_digest = dm_HMAC(dm_EVP_sha256(), rtOpts->securityOpts.key, rtOpts->securityOpts.keyLen,
 									(unsigned char *) ptpClock->msgIbuf,
-									packetLength + SEC_TLV_IMM_HMACSHA256_LENGTH - sizeof(ICV),
+									packetLength + SEC_TLV_CONSTANT_LEN,
 									NULL, NULL);
 
 			// ICV gets truncated to 128 bits, so compare only 16 bytes
-			if (memcmp(static_digest, sec_tlv.icv.digest, sizeof(ICV))) {
+			// msgIbuf + packetLength is the start of the secTLV, + SEC_TLV_CONSTANT_LEN is start of ICV (if imm)
+			// TODO change magic number to an icv length variable
+			if (memcmp(static_digest, ptpClock->msgIbuf + packetLength + SEC_TLV_CONSTANT_LEN, 16)) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.icvMismatchErrors++;
                 if(DM_MSGS) INFO("DM: icv's DIDNT MATCH on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
@@ -1458,8 +1460,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
             // for TESLA, restore correctionField to its previous value before it was zeroed out (might not even be
             // strictly necessary since the header information from msgIbuf was already pulled out into msgTmpHeader
-            if (rtOpts->securityOpts.secParamIndicator == TESLA ||
-                (rtOpts->securityOpts.secParamIndicator == GDOI && rtOpts->securityOpts.immIgnoreCorrection)) {
+            if (rtOpts->securityOpts.delayed ||
+                (!rtOpts->securityOpts.delayed && rtOpts->securityOpts.immIgnoreCorrection)) {
                 memcpy((ptpClock->msgIbuf + 8), &correctionFieldTmp.msb, 4);
                 memcpy((ptpClock->msgIbuf + 12), &correctionFieldTmp.lsb, 4);
             }
@@ -3195,7 +3197,7 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
         // in dep/msg.c
         addSecurityTLV(ptpClock->msgObuf, rtOpts);
         // DM: add size of sec tlv to the length of the packet to send
-        packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
+        packetLength += SEC_TLV_IMM_HMACSHA256_LEN;
     }
 
 #ifdef RUNTIME_DEBUG
@@ -3338,7 +3340,7 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 		// in dep/msg.c
 		addSecurityTLV(ptpClock->msgObuf, rtOpts);
 		// DM: add size of sec tlv to the length of the packet to send
-		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
+		packetLength += SEC_TLV_IMM_HMACSHA256_LEN;
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3434,7 +3436,7 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 		// in dep/msg.c
 		addSecurityTLV(ptpClock->msgObuf, rtOpts);
 		// DM: add size of sec tlv to the length of the packet to send
-		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
+		packetLength += SEC_TLV_IMM_HMACSHA256_LEN;
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3595,7 +3597,7 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 		// in dep/msg.c
 		addSecurityTLV(ptpClock->msgObuf, rtOpts);
 		// DM: add size of sec tlv to the length of the packet to send
-		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
+		packetLength += SEC_TLV_IMM_HMACSHA256_LEN;
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3680,7 +3682,7 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 		// in dep/msg.c
 		addSecurityTLV(ptpClock->msgObuf, rtOpts);
 		// DM: add size of sec tlv to the length of the packet to send
-		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
+		packetLength += SEC_TLV_IMM_HMACSHA256_LEN;
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3779,7 +3781,7 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 		// in dep/msg.c
 		addSecurityTLV(ptpClock->msgObuf, rtOpts);
 		// DM: add size of sec tlv to the length of the packet to send
-		packetLength += SEC_TLV_IMM_HMACSHA256_LENGTH;
+		packetLength += SEC_TLV_IMM_HMACSHA256_LEN;
 	}
 
 #ifdef RUNTIME_DEBUG

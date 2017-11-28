@@ -217,8 +217,8 @@ typedef struct {
 
 #ifdef PTPD_SECURITY
 typedef enum IntegrityAlgTyp {
-	HMAC,
-	GMAC
+	HMAC_SHA256,
+	GMAC_AES256
 } IntegrityAlgTyp;
 
 /* see dep/configdefaults.c loadDefaultSettings for currently hardcoded / default values */
@@ -242,20 +242,24 @@ typedef struct {
 	 * 32 bytes, need 64 chars and +1 for null byte */
 	char keyString[MAX_SEC_KEY_LEN * 2 + 1];
 
-	IntegrityAlgTyp integrityAlgTyp;
-	unsigned char integrityAlgTypOID[MAX_OID_LEN];
-	char integrityAlgTypOIDString[MAX_OID_LEN * 2 + 1];
-
-    // either 0x00 for immediate, or 0x04 for delayed
+    // flags indicating presence of optional fields; per current spec, only 3rd flag is used
+    // to indicate presence of disclosed key (delayed only), i.e. 0x04
     Octet secParamIndicator;
     char secParamIndicatorString[1 * 2 + 1]; // size of secParamIndicator * 2 + 1 for null
 
     // disclosedKey (optional), only for delayed
     // sequenceNo (optional), not used
     // reserved (optional), not used
+
     /* IntegrityAlgTyp;
      * the algorithm to use in ICV calc; determines ICV length and thus also total length (lengthField)
      * specified in the form of an OID number */
+    IntegrityAlgTyp integrityAlgTyp;
+	unsigned char integrityAlgTypOID[MAX_OID_LEN];
+	char integrityAlgTypOIDString[MAX_OID_LEN * 2 + 1];
+
+	// immediate or delayed security processing
+	Boolean delayed;
 
     // process messages that are not secure i.e. don't have security bit flipped
 	Boolean masterAcceptInsecureAnnounce;

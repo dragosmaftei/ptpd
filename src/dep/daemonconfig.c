@@ -998,6 +998,11 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
     parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:enable", PTPD_RESTART_NONE, &rtOpts->securityEnabled, rtOpts->securityEnabled,
                                     "Enable experimental security feature using security TLV.");
 
+	// specify immediate (e.g. GDOI) or delayed (e.g. TESLA) key management
+	parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:delayed", PTPD_RESTART_NONE,
+									&rtOpts->securityOpts.delayed, rtOpts->securityOpts.delayed,
+									"Specify whether we're emulating immediate or delayed key management.");
+
 	// read the key in as ascii rep of hex values
 	parseResult &= configMapString(opCode, opArg, dict, target, "security:key",
 								   PTPD_RESTART_NONE, rtOpts->securityOpts.keyString, sizeof(rtOpts->securityOpts.keyString), rtOpts->securityOpts.keyString,
@@ -1050,7 +1055,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 									&rtOpts->securityOpts.slaveAcceptInsecurePdelays, rtOpts->securityOpts.slaveAcceptInsecurePdelays,
 									"As slave, accept and process incoming pdelay messages that are not secure.");
 
-	// if using GDOI (immediate security processing), ignore correction field in ICV calculation
+	// if using immediate security processing (e.g. GDOI), ignore correction field in ICV calculation
 	parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:imm_ignore_correction", PTPD_RESTART_NONE,
 									&rtOpts->securityOpts.immIgnoreCorrection, rtOpts->securityOpts.immIgnoreCorrection,
 									"If using immediate security processing, ignore correction field in ICV calculation.");
@@ -1075,10 +1080,10 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 		printf("the OID size is: %d\n", rtOpts->securityOpts.integrityAlgTypOID[1] + 2);
 
 		// set integrityAlgTyp enum accordingly
-		if (memcmp(HMAC_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(HMAC_OID) - 1) == 0) {
-		    rtOpts->securityOpts.integrityAlgTyp = HMAC;
+		if (memcmp(HMAC_SHA256_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(HMAC_SHA256_OID) - 1) == 0) {
+		    rtOpts->securityOpts.integrityAlgTyp = HMAC_SHA256;
         } else if (memcmp(GMAC_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(GMAC_OID) - 1) == 0) {
-            rtOpts->securityOpts.integrityAlgTyp = GMAC;
+            rtOpts->securityOpts.integrityAlgTyp = GMAC_AES256;
         } else {
             // TODO make this print to correct error log
             printf("algorithm OID provided does not match, using HMAC as default\n");
@@ -1086,10 +1091,10 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 
 
         switch (rtOpts->securityOpts.integrityAlgTyp) {
-            case GMAC:
+            case GMAC_AES256:
                 printf("it's GMAC\n");
                 break;
-            case HMAC:
+            case HMAC_SHA256:
                 printf("it's HMAC\n");
                 break;
         }

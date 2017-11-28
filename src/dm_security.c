@@ -21,3 +21,9 @@ unsigned char *dm_HMAC(void *evp_md, const void *key,
                        unsigned char *md, unsigned int *md_len) {
     return HMAC((EVP_MD *)evp_md, key, key_len, d, n, md, md_len);
 }
+
+void dm_GMAC() {
+
+    EVP_CIPHER_CTX *ctx = NULL;
+    EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL);
+}
