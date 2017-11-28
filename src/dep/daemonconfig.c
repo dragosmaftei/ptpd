@@ -831,22 +831,23 @@ int tohex(unsigned char c)
 }
 
 void
-keyStringToBinary(char *keyString, unsigned char *key)
+stringToBinary(char *valueString, unsigned char *value, int maxLen)
 {
-    // keyString length will be double the key length, so run loop half that many times
-    for (int i = 0; i < strlen(keyString) / 2; i++) {
+    // valueString length will be double the value length, so run loop half that many times
+    for (int i = 0; i < strlen(valueString) / 2; i++) {
         char first, second;
-        first = tohex(keyString[i * 2]);
-        second = tohex(keyString[i * 2 + 1]);
+        first = tohex(valueString[i * 2]);
+        second = tohex(valueString[i * 2 + 1]);
         printf("i: %d, first: 0x%01x, second: 0x%01x\n", i, first, second);
 
         if ((first == -1) || (second == -1)) {
-            printf("invalid hex character in specified key string; key will be zeroed out\n");
-            memset(key, 0, MAX_SECURITY_KEY_LEN);
+            // TODO make this print to correct error log
+            printf("invalid hex character in specified input string; value will be zeroed out\n");
+            memset(value, 0, maxLen);
             return;
         }
         // multiplying by 16 shifts the hex value (4 bits) left 4 to make room for second
-        key[i] = first * 16 + second;
+        value[i] = first * 16 + second;
     }
 }
 #endif /* PTPD_SECURITY */
@@ -1002,6 +1003,12 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 								   PTPD_RESTART_NONE, rtOpts->securityOpts.keyString, sizeof(rtOpts->securityOpts.keyString), rtOpts->securityOpts.keyString,
 								   "Key to use in ICV calculation (required if security is enabled).");
 
+	// read the alg type OID in as ascii rep of hex values
+	parseResult &= configMapString(opCode, opArg, dict, target, "security:integrity_alg_typ",
+								   PTPD_RESTART_NONE, rtOpts->securityOpts.integrityAlgTypOIDString, sizeof(rtOpts->securityOpts.integrityAlgTypOIDString),
+								   rtOpts->securityOpts.integrityAlgTypOIDString,
+								   "Algorithm to use for ICV calculation (specified by its OID on-wire format).");
+
     // SPI value in ascii rep of hex values
     parseResult &= configMapString(opCode, opArg, dict, target, "security:spi",
                                    PTPD_RESTART_NONE, rtOpts->securityOpts.SPIString, sizeof(rtOpts->securityOpts.SPIString), rtOpts->securityOpts.SPIString,
@@ -1044,9 +1051,9 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 									"As slave, accept and process incoming pdelay messages that are not secure.");
 
 	// if using GDOI (immediate security processing), ignore correction field in ICV calculation
-	parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:gdoi_ignore_correction", PTPD_RESTART_NONE,
-									&rtOpts->securityOpts.gdoiIgnoreCorrection, rtOpts->securityOpts.gdoiIgnoreCorrection,
-									"If using GDOI, ignore correction field in ICV calculation.");
+	parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:imm_ignore_correction", PTPD_RESTART_NONE,
+									&rtOpts->securityOpts.immIgnoreCorrection, rtOpts->securityOpts.immIgnoreCorrection,
+									"If using immediate security processing, ignore correction field in ICV calculation.");
 
 
     printf("the keystring size is (should always be this): %lu\n", sizeof(rtOpts->securityOpts.keyString));
@@ -1054,10 +1061,42 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
     printf("the keyString is:\n\t");
     for (int i = 0; i < (sizeof(rtOpts->securityOpts.keyString) + 1); i++)
         printf("0x%02x ", rtOpts->securityOpts.keyString[i]);
+	printf("\n");
 
     if (rtOpts->securityEnabled) {
-        keyStringToBinary(rtOpts->securityOpts.keyString, rtOpts->securityOpts.key);
-        rtOpts->securityOpts.SPI =  (UInteger8) strtoul(rtOpts->securityOpts.SPIString, 0, 16); // base 16
+        stringToBinary(rtOpts->securityOpts.keyString, rtOpts->securityOpts.key, MAX_SEC_KEY_LEN);
+		stringToBinary(rtOpts->securityOpts.integrityAlgTypOIDString, rtOpts->securityOpts.integrityAlgTypOID, MAX_OID_LEN);
+
+		printf("the OID is: \n\t");
+		for (int i = 0; i < 20; i++)
+			printf("0x%02x ", rtOpts->securityOpts.integrityAlgTypOID[i]);
+		printf("\n");
+
+		printf("the OID size is: %d\n", rtOpts->securityOpts.integrityAlgTypOID[1] + 2);
+
+		// set integrityAlgTyp enum accordingly
+		if (memcmp(HMAC_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(HMAC_OID) - 1) == 0) {
+		    rtOpts->securityOpts.integrityAlgTyp = HMAC;
+        } else if (memcmp(GMAC_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(GMAC_OID) - 1) == 0) {
+            rtOpts->securityOpts.integrityAlgTyp = GMAC;
+        } else {
+            // TODO make this print to correct error log
+            printf("algorithm OID provided does not match, using HMAC as default\n");
+        }
+
+
+        switch (rtOpts->securityOpts.integrityAlgTyp) {
+            case GMAC:
+                printf("it's GMAC\n");
+                break;
+            case HMAC:
+                printf("it's HMAC\n");
+                break;
+        }
+
+
+
+		rtOpts->securityOpts.SPI =  (UInteger8) strtoul(rtOpts->securityOpts.SPIString, 0, 16); // base 16
         rtOpts->securityOpts.keyID =  (UInteger32) strtoul(rtOpts->securityOpts.keyIDString, 0, 16); // base 16
         rtOpts->securityOpts.secParamIndicator =  (Octet) strtoul(rtOpts->securityOpts.secParamIndicatorString, 0, 16); // base 16
 

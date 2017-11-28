@@ -216,6 +216,11 @@ typedef struct {
 } SyncDestEntry;
 
 #ifdef PTPD_SECURITY
+typedef enum IntegrityAlgTyp {
+	HMAC,
+	GMAC
+} IntegrityAlgTyp;
+
 /* see dep/configdefaults.c loadDefaultSettings for currently hardcoded / default values */
 typedef struct {
     // length of overall securityTLV payload i.e. length of the 'value' field;
@@ -232,10 +237,14 @@ typedef struct {
 
     int keyLen;
 
-    unsigned char key[MAX_SECURITY_KEY_LEN];
+    unsigned char key[MAX_SEC_KEY_LEN];
 	/* config file requires key in hex, read in as string initially, so for max key length
 	 * 32 bytes, need 64 chars and +1 for null byte */
-	char keyString[MAX_SECURITY_KEY_LEN * 2 + 1];
+	char keyString[MAX_SEC_KEY_LEN * 2 + 1];
+
+	IntegrityAlgTyp integrityAlgTyp;
+	unsigned char integrityAlgTypOID[MAX_OID_LEN];
+	char integrityAlgTypOIDString[MAX_OID_LEN * 2 + 1];
 
     // either 0x00 for immediate, or 0x04 for delayed
     Octet secParamIndicator;
@@ -256,8 +265,8 @@ typedef struct {
 	Boolean slaveAcceptInsecureSyncFollowup;
 	Boolean slaveAcceptInsecurePdelays;
 
-    // ignore correction field in ICV calculation if using GDOI
-    Boolean gdoiIgnoreCorrection;
+    // ignore correction field in ICV calculation if using immediate (GDOI)
+    Boolean immIgnoreCorrection;
 } SecurityOpts;
 #endif /* PTPD_SECURITY */
 

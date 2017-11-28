@@ -1433,7 +1433,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
             Integer64 correctionFieldTmp;
             // should this check be from rtOpts or from the received message's TLV?
             if (rtOpts->securityOpts.secParamIndicator == TESLA ||
-                (rtOpts->securityOpts.secParamIndicator == GDOI && rtOpts->securityOpts.gdoiIgnoreCorrection)) {
+                (rtOpts->securityOpts.secParamIndicator == GDOI && rtOpts->securityOpts.immIgnoreCorrection)) {
                 memcpy(&correctionFieldTmp.msb, (ptpClock->msgIbuf + 8), 4);
                 memcpy(&correctionFieldTmp.lsb, (ptpClock->msgIbuf + 12), 4);
                 // don't need to flip the values copied into correctionFieldTmp since they won't be interpreted/used
@@ -1459,7 +1459,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
             // for TESLA, restore correctionField to its previous value before it was zeroed out (might not even be
             // strictly necessary since the header information from msgIbuf was already pulled out into msgTmpHeader
             if (rtOpts->securityOpts.secParamIndicator == TESLA ||
-                (rtOpts->securityOpts.secParamIndicator == GDOI && rtOpts->securityOpts.gdoiIgnoreCorrection)) {
+                (rtOpts->securityOpts.secParamIndicator == GDOI && rtOpts->securityOpts.immIgnoreCorrection)) {
                 memcpy((ptpClock->msgIbuf + 8), &correctionFieldTmp.msb, 4);
                 memcpy((ptpClock->msgIbuf + 12), &correctionFieldTmp.lsb, 4);
             }
