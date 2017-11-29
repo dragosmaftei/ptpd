@@ -1733,7 +1733,7 @@ msgPackHeader(Octet * buf, PtpClock * ptpClock)
 
 #ifdef PTPD_SECURITY
 
-// these only pack and unpack constant length fields of the security TLV, see securityTLV.def
+/* these only pack and unpack constant length fields of the security TLV, see securityTLV.def */
 void
 msgUnpackSecurityTLV(Octet * buf, SecurityTLV *data, PtpClock *ptpClock)
 {
@@ -1760,62 +1760,70 @@ void msgPackSecurityTLV(SecurityTLV *data, Octet *buf)
 /*
  * buf is the output buffer
  * this should be called after the buffer has been packed (including header) for the type of message
- *
  */
 void addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
 {
-    // DM: adding security flag to the header
+    /* adding security flag to the header */
     *(UInteger8 *) (buf + 6) |= PTP_SECURITY;
 
-    // get message length out from the header
+    /* get message length out from the header */
     UInteger16  msg_len = flip16(*(UInteger16 *) (buf + 2));
 //    if(DM_MSGS) INFO("DM: pulled out msg length: %d\n", msg_len);
-    // DM: adjusting the header's message length field to account for sec TLV
+    /* adjusting the header's message length field to account for sec TLV */
     *(UInteger16 *) (buf + 2) = flip16(msg_len + SEC_TLV_IMM_HMACSHA256_LEN);
 
-    // make TLV struct and populate it before packing the buffer
+    /* make TLV struct and populate it before packing the buffer */
     SecurityTLV sec_tlv;
     sec_tlv.tlvType = SECURITY;
     sec_tlv.lengthField = rtOpts->securityOpts.lengthField;
-    sec_tlv.SPI = rtOpts->securityOpts.SPI;
+    sec_tlv.SPP = rtOpts->securityOpts.SPP;
     sec_tlv.keyID = rtOpts->securityOpts.keyID;
     sec_tlv.secParamIndicator = rtOpts->securityOpts.secParamIndicator;
 
-    // pack the buffer to avoid the padding inherent in structs
-    // start at end of sync message
+    /*
+     * pack the buffer to avoid the padding inherent in structs
+     * start at end of sync message
+     */
     msgPackSecurityTLV(&sec_tlv, buf + msg_len);
 
-    // if delayed processing, save correction field and zero it out before calculating ICV
-    // fill it back in the buffer later
+    /*
+     * if delayed processing, save correction field and zero it out before calculating ICV
+     * fill it back in the buffer later
+     */
     Integer64 correctionFieldTmp;
 
     if (rtOpts->securityOpts.delayed ||
         (!rtOpts->securityOpts.delayed && rtOpts->securityOpts.immIgnoreCorrection)) {
         memcpy(&correctionFieldTmp.msb, (buf + 8), 4);
         memcpy(&correctionFieldTmp.lsb, (buf + 12), 4);
-        // don't need to flip the values copied into correctionFieldTmp since they won't be interpreted/used
+        /* don't need to flip the values copied into correctionFieldTmp since they won't be interpreted/used */
         memset(buf + 8, 0, 8); // zero out the correction field
     }
 
 
 
-    // calculate ICV from buffer, then pack it directly in the buffer
+    /* calculate ICV from buffer, then pack it directly in the buffer */
     unsigned char *static_digest;
 
 //    if(DM_MSGS) INFO("DM: SECURITY ENABLED, key is: %s (strlen: %d)\n", rtOpts->securityOpts.key, strlen(rtOpts->securityOpts.key));
 
-    // want from header all the way up to ICV, so 44 for SYNCLENGTH, + length of the constant fields (+ disclosed key if applicable)
+    /*
+     * want from header all the way up to ICV, so
+     * 44 for SYNCLENGTH, + length of the constant fields (+ disclosed key if applicable)
+     */
     static_digest = dm_HMAC(dm_EVP_sha256(), rtOpts->securityOpts.key, rtOpts->securityOpts.keyLen,
                             (unsigned char *) buf, msg_len + SEC_TLV_CONSTANT_LEN,
                             NULL, NULL);
 
-    // truncate the digest to 128 bits and pack it by copying just 16 bytes directly into the buffer
+    /* truncate the digest to 128 bits and pack it by copying just 16 bytes directly into the buffer */
     memcpy(buf + msg_len + SEC_TLV_CONSTANT_LEN, static_digest, 16);
 
 
 
-    // for delayed (or if imm but ignoring correction field),
-    // restore correctionField to its previous value before it was zeroed out
+    /*
+     * for delayed (or if imm but ignoring correction field),
+     * restore correctionField to its previous value before it was zeroed out
+     */
     if (rtOpts->securityOpts.delayed ||
         (!rtOpts->securityOpts.delayed && rtOpts->securityOpts.immIgnoreCorrection)) {
         memcpy((buf + 8), &correctionFieldTmp.msb, 4);

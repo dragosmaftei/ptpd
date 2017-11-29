@@ -78,9 +78,19 @@ typedef struct
 	uint32_t consecutiveSequenceErrors;    /* number of consecutive sequence mismatch errors */
 
 #ifdef PTPD_SECURITY
+    /*
+     * if adding error counters here, also add them to:
+     * - displayCounters() in display.c
+     * - writeStatusFile() in sys.c
+     */
     uint32_t securityErrors; /* icv didn't match... */
-	uint32_t icvMismatchErrors; /* failed icv verification; icvs didn't match */
-	uint32_t securityTLVExpectedErrors; /* expected secure msg, but msg header didn't have security bit flipped */
+    /* expected secure msg, but msg header didn't have security bit flipped, OR TLV type field not correct */
+    uint32_t securityTLVExpectedErrors;
+    /* length field from incoming message's TLV didn't match calculated length based on our security parameters */
+	uint32_t lengthMismatchErrors;
+	uint32_t SPPMismatchErrors; /* SPP from incoming message's TLV didn't match SPP from SPD query */
+    uint32_t keyIDMismatchErrors; /* keyID from incoming message's TLV didn't match keyID from our "SA" */
+    uint32_t icvMismatchErrors; /* failed icv verification; icvs didn't match */
 #endif /* PTPD_SECURITY */
 
 	/* unicast sgnaling counters */
@@ -223,45 +233,67 @@ typedef enum IntegrityAlgTyp {
 
 /* see dep/configdefaults.c loadDefaultSettings for currently hardcoded / default values */
 typedef struct {
-    // length of overall securityTLV payload i.e. length of the 'value' field;
-    // depends on the key used and the security scheme (immediate vs delayed)
+    /* length of overall securityTLV payload i.e. length of the 'value' field */
     UInteger16 lengthField;
 
-    // security parameter index; enables querying the SAD for the relevant SA
-    UInteger8 SPI;
-    char SPIString[1 * 2 + 1]; // size of SPI (1 byte) * 2 + 1 for null
+	/*
+     * length of overall securityTLV (including Type and Length i.e. payload + 4
+     * this will only be learned after checking the SA (in this emulation, the config file) for variable fields
+     */
+	UInteger16 secTLVLen;
 
-    // supposed to identify the value of the currently used key (if GDOI/immediate)
+
+    /* security parameter pointer; enables querying the SAD for the relevant SA */
+    UInteger8 SPP;
+    char SPPString[1 * 2 + 1]; // size of SPP (1 byte) * 2 + 1 for null
+
+    /* supposed to identify the value of the currently used key (if GDOI/immediate) */
     UInteger32 keyID;
     char keyIDString[4 * 2 + 1]; // size of keyID (4) * 2 + 1 for null
 
-    int keyLen;
+	/* this will be set in daemonconfig.c after reading in the key from the config file */
+    UInteger16 keyLen;
 
     unsigned char key[MAX_SEC_KEY_LEN];
-	/* config file requires key in hex, read in as string initially, so for max key length
-	 * 32 bytes, need 64 chars and +1 for null byte */
+	/*
+	 * config file requires key in hex, read in as string initially, so for max key length
+	 * 32 bytes, need 64 chars and +1 for null byte
+	 */
 	char keyString[MAX_SEC_KEY_LEN * 2 + 1];
 
-    // flags indicating presence of optional fields; per current spec, only 3rd flag is used
-    // to indicate presence of disclosed key (delayed only), i.e. 0x04
+    /*
+     * flags indicating presence of optional fields; per current spec, only 3rd flag is used
+     * to indicate presence of disclosed key (delayed only), i.e. 0x04
+     */
     Octet secParamIndicator;
     char secParamIndicatorString[1 * 2 + 1]; // size of secParamIndicator * 2 + 1 for null
 
-    // disclosedKey (optional), only for delayed
-    // sequenceNo (optional), not used
-    // reserved (optional), not used
+    /*
+     * disclosedKey (optional), only for delayed
+     * sequenceNo (optional), not used
+     * reserved (optional), not used
+     */
 
-    /* IntegrityAlgTyp;
+    /*
+     * IntegrityAlgTyp;
      * the algorithm to use in ICV calc; determines ICV length and thus also total length (lengthField)
-     * specified in the form of an OID number */
+     * specified in the form of an OID number
+     */
     IntegrityAlgTyp integrityAlgTyp;
 	unsigned char integrityAlgTypOID[MAX_OID_LEN];
 	char integrityAlgTypOIDString[MAX_OID_LEN * 2 + 1];
 
-	// immediate or delayed security processing
+	/*
+	 * this will be set in daemonconfig.c after reading in the alg type config file
+	 * NOTE: for GMAC, the calculated MAC/tag/"ICV" is 16, but it must be sent along with the randomized IV (12)
+	 * that it was generated with... thus icvLength will include the IV length, i.e. IV(12) + tag(16) = 28
+	 */
+	UInteger16 icvLength;
+
+	/* immediate or delayed security processing */
 	Boolean delayed;
 
-    // process messages that are not secure i.e. don't have security bit flipped
+    /* process messages that are not secure i.e. don't have security bit flipped */
 	Boolean masterAcceptInsecureAnnounce;
 	Boolean masterAcceptInsecureSyncFollowup;
 	Boolean masterAcceptInsecurePdelays;
@@ -269,7 +301,7 @@ typedef struct {
 	Boolean slaveAcceptInsecureSyncFollowup;
 	Boolean slaveAcceptInsecurePdelays;
 
-    // ignore correction field in ICV calculation if using immediate (GDOI)
+    /* ignore correction field in ICV calculation if using immediate (GDOI) */
     Boolean immIgnoreCorrection;
 } SecurityOpts;
 #endif /* PTPD_SECURITY */
@@ -536,7 +568,7 @@ typedef struct {
 } RunTimeOpts;
 
 #if defined(PTPD_SECURITY) && defined(RUNTIME_DEBUG)
-// struct to measure extra processing time added by security processing
+/* struct to measure extra processing time added by security processing */
 typedef struct {
     int numAnnounceMeasurements;
 	struct timespec announces[MAX_NUM_TIMING_MEASUREMENTS];

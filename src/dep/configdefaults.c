@@ -445,14 +445,11 @@ loadDefaultSettings( RunTimeOpts* rtOpts )
 	rtOpts->clockUpdateTimeout = 0;
 
 #ifdef PTPD_SECURITY
-    /* rtOpts memory set to 0 at start of function, so all security defaults not listed here
-        will be false, key all 0s, etc... */
-
+    /*
+     * rtOpts memory set to 0 at start of function, so all security defaults not listed here
+     * will be false, key all 0s, etc...
+     */
     rtOpts->securityOpts.integrityAlgTyp = HMAC_SHA256;
-
-    // - 4 so as to not include the "Type" and "Length" lengths of the TLV
-    // TODO length should be calculated at packing time...
-    //rtOpts->securityOpts.lengthField = SEC_TLV_IMM_HMACSHA256_LEN - 4;
 #endif /* PTPD_SECURITY */
 }
 

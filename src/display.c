@@ -979,10 +979,18 @@ displayCounters(const PtpClock * ptpClock)
 #ifdef PTPD_SECURITY
 	INFO("           securityErrors : %lu\n",
 		 (unsigned long)ptpClock->counters.securityErrors);
+    INFO("           securityTLVExpectedErrors : %lu\n",
+         (unsigned long)ptpClock->counters.securityTLVExpectedErrors);
+    INFO("           lengthMismatchErrors : %lu\n",
+         (unsigned long)ptpClock->counters.lengthMismatchErrors);
+    INFO("           SPPMismatchErrors : %lu\n",
+         (unsigned long)ptpClock->counters.SPPMismatchErrors);
+    INFO("           keyIDMismatchErrors : %lu\n",
+         (unsigned long)ptpClock->counters.keyIDMismatchErrors);
 	INFO("           icvMismatchErrors : %lu\n",
 		 (unsigned long)ptpClock->counters.icvMismatchErrors);
-	INFO("           securityTLVExpectedErrors : %lu\n",
-		 (unsigned long)ptpClock->counters.securityTLVExpectedErrors);
+
+
 
 #ifdef RUNTIME_DEBUG
 	INFO("           avg time added by sec processing on announce (%d measurements) : %us%uns\n",

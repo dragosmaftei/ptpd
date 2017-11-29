@@ -455,7 +455,7 @@ typedef struct {
 /* Security TLV struct */
 typedef struct {
 	#define OPERATE( name, size, type) type name;
-	// doesn't include variable length fields (optional fields, and ICV)
+	/* doesn't include variable length fields (optional fields, and ICV) */
 	#include "def/securityTLV/securityTLV.def"
 
 } SecurityTLV;

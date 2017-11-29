@@ -2,8 +2,8 @@
 // Created by iol on 5/19/17.
 //
 
-#include <openssl/hmac.h> // includes HMAC and EVP_sha256()
-//#include <openssl/evp.h> // this has EVP_sha256() only
+#include <openssl/hmac.h> /* includes HMAC and EVP_sha256() */
+//#include <openssl/evp.h> /* this has EVP_sha256() only */
 
 /*
  * just call the actual openssl version

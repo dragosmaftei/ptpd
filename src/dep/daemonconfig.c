@@ -833,7 +833,7 @@ int tohex(unsigned char c)
 void
 stringToBinary(char *valueString, unsigned char *value, int maxLen)
 {
-    // valueString length will be double the value length, so run loop half that many times
+    /* valueString length will be double the value length, so run loop half that many times */
     for (int i = 0; i < strlen(valueString) / 2; i++) {
         char first, second;
         first = tohex(valueString[i * 2]);
@@ -846,7 +846,7 @@ stringToBinary(char *valueString, unsigned char *value, int maxLen)
             memset(value, 0, maxLen);
             return;
         }
-        // multiplying by 16 shifts the hex value (4 bits) left 4 to make room for second
+        /* multiplying by 16 shifts the hex value (4 bits) left 4 to make room for second */
         value[i] = first * 16 + second;
     }
 }
@@ -994,42 +994,45 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 
 
 #ifdef PTPD_SECURITY
-    // DM: security enabled config file switch; not sure about restart flags, using PTPD_RESTART_NONE for now
+    /*
+     * config file switch to emulate the querying of the SPD to determine whether security processing is needed
+     * not sure about restart flags, using PTPD_RESTART_NONE for now
+     */
     parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:enable", PTPD_RESTART_NONE, &rtOpts->securityEnabled, rtOpts->securityEnabled,
                                     "Enable experimental security feature using security TLV.");
 
-	// specify immediate (e.g. GDOI) or delayed (e.g. TESLA) key management
+	/* specify immediate (e.g. GDOI) or delayed (e.g. TESLA) key management */
 	parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:delayed", PTPD_RESTART_NONE,
 									&rtOpts->securityOpts.delayed, rtOpts->securityOpts.delayed,
 									"Specify whether we're emulating immediate or delayed key management.");
 
-	// read the key in as ascii rep of hex values
+	/* read the key in as ascii rep of hex values */
 	parseResult &= configMapString(opCode, opArg, dict, target, "security:key",
 								   PTPD_RESTART_NONE, rtOpts->securityOpts.keyString, sizeof(rtOpts->securityOpts.keyString), rtOpts->securityOpts.keyString,
 								   "Key to use in ICV calculation (required if security is enabled).");
 
-	// read the alg type OID in as ascii rep of hex values
+	/* read the alg type OID in as ascii rep of hex values */
 	parseResult &= configMapString(opCode, opArg, dict, target, "security:integrity_alg_typ",
 								   PTPD_RESTART_NONE, rtOpts->securityOpts.integrityAlgTypOIDString, sizeof(rtOpts->securityOpts.integrityAlgTypOIDString),
 								   rtOpts->securityOpts.integrityAlgTypOIDString,
 								   "Algorithm to use for ICV calculation (specified by its OID on-wire format).");
 
-    // SPI value in ascii rep of hex values
-    parseResult &= configMapString(opCode, opArg, dict, target, "security:spi",
-                                   PTPD_RESTART_NONE, rtOpts->securityOpts.SPIString, sizeof(rtOpts->securityOpts.SPIString), rtOpts->securityOpts.SPIString,
-                                   "1 byte SPI value");
+    /* SPP value in ascii rep of hex values */
+    parseResult &= configMapString(opCode, opArg, dict, target, "security:spp",
+                                   PTPD_RESTART_NONE, rtOpts->securityOpts.SPPString, sizeof(rtOpts->securityOpts.SPPString), rtOpts->securityOpts.SPPString,
+                                   "1 byte SPP value");
 
-    // key id value in ascii rep of hex values
+    /* key id value in ascii rep of hex values */
     parseResult &= configMapString(opCode, opArg, dict, target, "security:key_id",
                                    PTPD_RESTART_NONE, rtOpts->securityOpts.keyIDString, sizeof(rtOpts->securityOpts.keyIDString), rtOpts->securityOpts.keyIDString,
                                    "4 byte key id value");
 
-    // security parameter indicator value in ascii rep of hex values
+    /* security parameter indicator value in ascii rep of hex values */
     parseResult &= configMapString(opCode, opArg, dict, target, "security:sec_param_indicator",
                                    PTPD_RESTART_NONE, rtOpts->securityOpts.secParamIndicatorString, sizeof(rtOpts->securityOpts.secParamIndicatorString),
                                    rtOpts->securityOpts.secParamIndicatorString, "1 byte security parameter indicator");
 
-    // when security is enabled and in master state, accept and process insecure messages (messages w/out security bit flipped)
+    /* when security is enabled and in master state, accept and process insecure messages (messages w/out security bit flipped) */
     parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:master_accept_insecure_announce", PTPD_RESTART_NONE,
 									&rtOpts->securityOpts.masterAcceptInsecureAnnounce, rtOpts->securityOpts.masterAcceptInsecureAnnounce,
 									"As master, accept and process incoming announce messages that are not secure.");
@@ -1042,7 +1045,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 									&rtOpts->securityOpts.masterAcceptInsecurePdelays, rtOpts->securityOpts.masterAcceptInsecurePdelays,
 									"As master, accept and process incoming pdelay messages that are not secure.");
 
-    // when security is enabled and in slave state, accept and process insecure messages (messages w/out security bit flipped)
+    /* when security is enabled and in slave state, accept and process insecure messages (messages w/out security bit flipped) */
     parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:slave_accept_insecure_announce", PTPD_RESTART_NONE,
 									&rtOpts->securityOpts.slaveAcceptInsecureAnnounce, rtOpts->securityOpts.slaveAcceptInsecureAnnounce,
 									"As slave, accept and process incoming announce messages that are not secure.");
@@ -1055,7 +1058,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 									&rtOpts->securityOpts.slaveAcceptInsecurePdelays, rtOpts->securityOpts.slaveAcceptInsecurePdelays,
 									"As slave, accept and process incoming pdelay messages that are not secure.");
 
-	// if using immediate security processing (e.g. GDOI), ignore correction field in ICV calculation
+	/* if using immediate security processing (e.g. GDOI), ignore correction field in ICV calculation */
 	parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:imm_ignore_correction", PTPD_RESTART_NONE,
 									&rtOpts->securityOpts.immIgnoreCorrection, rtOpts->securityOpts.immIgnoreCorrection,
 									"If using immediate security processing, ignore correction field in ICV calculation.");
@@ -1079,11 +1082,17 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 
 		printf("the OID size is: %d\n", rtOpts->securityOpts.integrityAlgTypOID[1] + 2);
 
-		// set integrityAlgTyp enum accordingly
+		/* set integrityAlgTyp enum accordingly */
 		if (memcmp(HMAC_SHA256_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(HMAC_SHA256_OID) - 1) == 0) {
 		    rtOpts->securityOpts.integrityAlgTyp = HMAC_SHA256;
+            rtOpts->securityOpts.icvLength = 16;
         } else if (memcmp(GMAC_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(GMAC_OID) - 1) == 0) {
             rtOpts->securityOpts.integrityAlgTyp = GMAC_AES256;
+            /*
+             * for GMAC, the calculated MAC/tag/"ICV" is 16, but it must be sent along with the randomized IV (12)
+             * that it gets generated with... thus icvLength will include the IV length, i.e. IV(12) + tag(16) = 28
+             */
+            rtOpts->securityOpts.icvLength = 28;
         } else {
             // TODO make this print to correct error log
             printf("algorithm OID provided does not match, using HMAC as default\n");
@@ -1101,23 +1110,20 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 
 
 
-		rtOpts->securityOpts.SPI =  (UInteger8) strtoul(rtOpts->securityOpts.SPIString, 0, 16); // base 16
+		rtOpts->securityOpts.SPP =  (UInteger8) strtoul(rtOpts->securityOpts.SPPString, 0, 16); // base 16
         rtOpts->securityOpts.keyID =  (UInteger32) strtoul(rtOpts->securityOpts.keyIDString, 0, 16); // base 16
         rtOpts->securityOpts.secParamIndicator =  (Octet) strtoul(rtOpts->securityOpts.secParamIndicatorString, 0, 16); // base 16
 
-        // set the key length based on the inputted key string from the config file
+        /* set the key length based on the inputted key string from the config file */
         rtOpts->securityOpts.keyLen = strlen(rtOpts->securityOpts.keyString) / 2;
     }
-
-	// testing preproc
-    printf("PTPD_SECURITY IS DEFINED\n");
 
     printf("the key is (length: %d):\n\t", rtOpts->securityOpts.keyLen);
     for (int i = 0; i < 33; i++) {
         printf("0x%02x ", rtOpts->securityOpts.key[i]);
     }
-    printf("\nSPI: %02x\nkeyid: %08x\nsecparamind: %02x\n",
-           rtOpts->securityOpts.SPI, rtOpts->securityOpts.keyID, rtOpts->securityOpts.secParamIndicator);
+    printf("\nSPP: %02x\nkeyid: %08x\nsecparamind: %02x\n",
+           rtOpts->securityOpts.SPP, rtOpts->securityOpts.keyID, rtOpts->securityOpts.secParamIndicator);
 
 #endif /* PTPD_SECURITY */
 

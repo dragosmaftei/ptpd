@@ -1,22 +1,24 @@
 /* to use these definitions, #define OPERATE then #include this file in your source */
 OPERATE( tlvType, 2, Enumeration16)
 OPERATE( lengthField, 2, UInteger16)
-// SPI 1 octet
-OPERATE( SPI, 1, UInteger8)
-// keyID 4 octets
+/* SPP (security parameter pointer) 1 octet */
+OPERATE( SPP, 1, UInteger8)
+/* keyID 4 octets */
 OPERATE( keyID, 4, UInteger32)
-// secParamIndicator 1 octet
-// either 0x00 for immediate, or 0x04 for delayed
+/* secParamIndicator 1 octet */
+/* either 0x00 for immediate, or 0x04 for delayed */
 OPERATE ( secParamIndicator, 1, Octet)
 
-// optional fields and ICV are variable, they will be packed and unpacked manually
-
-// disclosedKey (optional) variable, only for delayed security processing
-// sequenceNo (optional) variable, not used
-// reserved (optional) variable, not used
-
-// ICV.. length dependent upon the IntegrityAlgTyp, 2 supported:
-// HMAC-SHA256-128; 256 bit key, output (the MAC, i.e. the ICV) is truncated to 128 bits = 16 bytes
-// AES256 GMAC mode (authentication only), 256 bit key, 12 byte random IV + 16 byte tag = 28 bytes
+/* optional fields and ICV are variable, they will be packed and unpacked manually
+ *
+ * disclosedKey (optional) variable, only for delayed security processing
+ * sequenceNo (optional) variable, not used
+ * reserved (optional) variable, not used
+ *
+ * ICV.. length dependent upon the IntegrityAlgTyp, 2 supported:
+ * - HMAC-SHA256-128; 256 bit key, output (the MAC, i.e. the ICV) is truncated to 128 bits = 16 bytes
+ * - AES256 GMAC mode (authentication only), 256 bit key, 12 byte random IV + 16 byte tag = 28 bytes
+ *
+ */
 
 #undef OPERATE
