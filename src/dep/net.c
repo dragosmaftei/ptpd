@@ -689,7 +689,6 @@ netSetMulticastLoopback(NetPath * netPath, Boolean value) {
 #if defined(SO_TIMESTAMPING) && defined(SO_TIMESTAMPNS)
 static Boolean
 getTxTimestamp(NetPath* netPath,TimeInternal* timeStamp) {
-	if(DM_MSGS) INFO("DM: getTxtTimestamp called!\n");
 	extern PtpClock *G_ptpClock;
 	ssize_t length;
 	fd_set tmpSet;
@@ -768,8 +767,6 @@ failure:
 static Boolean
 netInitTimestamping(NetPath * netPath, const RunTimeOpts * rtOpts)
 {
-	if(DM_MSGS) INFO("DM: netInitTimestamping starting\n");
-
 	int val = 1;
 	Boolean result = TRUE;
 #if defined(SO_TIMESTAMPING) && defined(SO_TIMESTAMPNS)/* Linux - current API */
@@ -1009,23 +1006,6 @@ netInit(NetPath * netPath, RunTimeOpts * rtOpts, PtpClock * ptpClock)
 
 	DBG("netInit\n");
 
-// DM: trying to see whats defined...
-#ifdef PTPD_PCAP
-	if(DM_MSGS) INFO("DM: PTPD_PCAP is defd\n");
-#endif
-#ifdef SO_TIMESTAMPING
-	if(DM_MSGS) INFO("DM: SO_TIMESTAMPING is defd\n");
-#endif
-#ifdef SO_TIMESTAMP
-	if(DM_MSGS) INFO("DM: SO_TIMESTAMP is defd\n");
-#endif
-#ifdef SO_TIMESTAMPNS
-	if(DM_MSGS) INFO("DM: SO_TIMESTAMPNS is defd\n");
-#endif
-#ifdef PTPD_SNMP
-	if(DM_MSGS) INFO("DM: PTPD_SNMP is defd\n");
-#endif
-
 #ifdef PTPD_PCAP
 	netPath->pcapEvent = NULL;
 	netPath->pcapGeneral = NULL;
@@ -1102,8 +1082,6 @@ netInit(NetPath * netPath, RunTimeOpts * rtOpts, PtpClock * ptpClock)
 
 #ifdef PTPD_PCAP
 	if (rtOpts->pcap == TRUE) {
-
-		if(DM_MSGS) INFO("DM: rtOpts->pcap IS true, so a pcap_open_live is called and pcap_t handle is stored in netPath->pcapEvent, and netPath->pcapGeneral\n");
 
 		netPath->txTimestampFailure = TRUE;
 
@@ -1184,7 +1162,6 @@ netInit(NetPath * netPath, RunTimeOpts * rtOpts, PtpClock * ptpClock)
 
 #ifdef PTPD_PCAP
 	if(rtOpts->transport == IEEE_802_3) {
-		if(DM_MSGS) INFO("DM: PCAP is defd, and transport is 802.3 Ethernet..\n");
 		close(netPath->eventSock);
 		netPath->eventSock = -1;
 		close(netPath->generalSock);
@@ -1195,8 +1172,6 @@ netInit(NetPath * netPath, RunTimeOpts * rtOpts, PtpClock * ptpClock)
 #endif /* SO_TIMESTAMPING */
 	} else {
 #endif
-
-		if(DM_MSGS) INFO("DM: giant ELSE if transport is NOT Ethernet...?\n"); // DM: this whole else gets skipped on desktop...
 
 		/* save interface address for IGMP refresh */
 		{
@@ -1413,12 +1388,9 @@ netInit(NetPath * netPath, RunTimeOpts * rtOpts, PtpClock * ptpClock)
 				return FALSE;
 			}
 
-	if(DM_MSGS) INFO("DM: this is the end of the giant else.. if we never entered it, shouldn't have gotten here\n");
 #ifdef PTPD_PCAP
 	}
 #endif
-
-	if(DM_MSGS) INFO("DM: outside the giant else, about to 'compile ACLs' and exit\n ");
 
 	/* Compile ACLs */
 	if(rtOpts->timingAclEnabled) {

@@ -1347,9 +1347,6 @@ recordTimingMeasurement(PtpClock *ptpClock, Enumeration4Lower type, Boolean recv
 void
 processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp, ssize_t length)
 {
-
-    if(DM_MSGS) INFO("DM: processMessage starting\n");
-
     Boolean isFromSelf;
 
     /*
@@ -1399,10 +1396,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
     if (rtOpts->securityEnabled) {
         /* our emulated SPD query resulted in YES, so next we must check that the security flag is set in the header */
         if ((ptpClock->msgTmpHeader.flagField0 & PTP_SECURITY) == PTP_SECURITY) {
-//            if(DM_MSGS) INFO("DM: security flag set on this message with flag0: %02x\n", ptpClock->msgTmpHeader.flagField0);
-
             /* figure out packet length based on message and unpack the TLV from buffer into local struct */
-
             UInteger16 packetLength;
 
             switch (ptpClock->msgTmpHeader.messageType) {
@@ -1472,19 +1466,19 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
 			/*
              * now that we've verified the SPP, we can use it to query the SAD and get the relevant SA, which
-             * contains other necessary parameters: imm/delayed, keyID, key, keylen, algType (and thus ICV length)
-             * only at this point can we know the actual length of the securityTLV:
-             * - if delayed, check secParamIndicator to find out whether TLV contains disclosedKey (size: D)
-             * -- if it does, then we can calculate D = keyLen
-             * - ICV size (K) is determined by algType
-             * - thus, securityTLV length should be 10 + D + K
-             *
-             * this calculated length based on the security parameters from our SA should match lengthField
-             * of incoming TLV
+             * contains other necessary parameters: imm/delayed, keyID, key, keylen, algType (and thus ICV length),
+             * total TLV length (variable based on ICV length) NOT including optional fields, and for delayed, a key
+             * disclosure delay...
+             * to get the actual total TLV length, we just pull down the length stored in the SA / securityOpts (constant
+     		 * fields + ICV length), and account for the disclosed key if applicable (signalled by the disclosedKey bit
+     		 * in the received TLV's secParamIndicator field); this calculated length based on the security parameters
+     		 * from our SA should match lengthField of incoming TLV
              */
 
 			UInteger16 secTLVLen = rtOpts->securityOpts.secTLVLen;
 
+            INFO("DM: processMessage, inc tlv SPI: %01x, SPI_DISCLOSED_KEY: %01x, anded: %01x\n",
+                sec_tlv.secParamIndicator, SPI_DISCLOSED_KEY, (sec_tlv.secParamIndicator & SPI_DISCLOSED_KEY));
 			/* if delayed processing, check SPI for flag indicating the presence of the disclosed key */
 			if (rtOpts->securityOpts.delayed &&
 				((sec_tlv.secParamIndicator & SPI_DISCLOSED_KEY) == SPI_DISCLOSED_KEY)) {
@@ -1492,6 +1486,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                  * we're using delayed processing, and the SPI indicates that this TLV contains a disclosed key
                  * so adjust length accordingly (add key length)
                  */
+                INFO("DM: processMessage, adding key len to secTLVlen\n");
 				secTLVLen += rtOpts->securityOpts.keyLen;
 
 			} /* else, either not delayed, or delayed, but no disclosed key in this TLV, so don't adjust len */
@@ -1500,6 +1495,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			 * now verify our calculated length is the same as the incoming message's TLV's length field
 			 * check error condition first so we can just return
 			 */
+
+			INFO("DM: processMessage, about to do the check... secops: %d, inc tlv: %d\n", rtOpts->securityOpts.secTLVLen, sec_tlv.lengthField);
 			if (rtOpts->securityOpts.secTLVLen != sec_tlv.lengthField + 4) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.lengthMismatchErrors++;
@@ -1764,8 +1761,6 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
     DBG("      ==> %s message received, sequence %d\n", getMessageTypeName(ptpClock->msgTmpHeader.messageType),
 							ptpClock->msgTmpHeader.sequenceId);
-	if(DM_MSGS) INFO("DM: processMessage timestamp (internal time) %us %dns\n",
-		 timeStamp->seconds, timeStamp->nanoseconds);
 
     /*
      *  on the table below, note that only the event messsages are passed the local time,
@@ -2397,12 +2392,8 @@ static void
 processSyncFromSelf(const TimeInternal * tint, const RunTimeOpts * rtOpts, PtpClock * ptpClock, Integer32 dst, const UInteger16 sequenceId) {
 	TimeInternal timestamp;
 	/*Add latency*/
-	if(DM_MSGS) INFO("DM: processSyncFromSelf timestamp (internal time) %us %dns\n",
-		 tint->seconds, tint->nanoseconds);
 	addTime(&timestamp, tint, &rtOpts->outboundLatency);
 	/* Issue follow-up CORRESPONDING TO THIS SYNC */
-	if(DM_MSGS) INFO("DM: processSyncFromSelf timestamp (timestamp) %us %dns\n",
-		 timestamp.seconds, timestamp.nanoseconds);
 	issueFollowup(&timestamp, rtOpts, ptpClock, dst, sequenceId);
 }
 #endif /* PTPD_SLAVE_ONLY */
@@ -3300,7 +3291,7 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
 
 	msgPackAnnounce(ptpClock->msgObuf, *sequenceId, &originTimestamp, ptpClock);
 
-    // DM: use packetLength variable, add size of securityTLV if security is on
+	/* use packetLength variable, add size of securityTLV if security is on */
     UInteger16 packetLength = ANNOUNCE_LENGTH;
 
 #ifdef PTPD_SECURITY
@@ -3349,7 +3340,6 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
 static void
 issueSync(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 {
-    if(DM_MSGS) INFO("DM: issueSync starting\n");
 	Integer32 dst = 0;
 	int i = 0;
 	UnicastGrantData *grant = NULL;
@@ -3438,14 +3428,9 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 
 	now = internalTime;
 
-	if(DM_MSGS) INFO("DM: issueSyncSingle timestamp (internal time) %us %dns\n",
-		 internalTime.seconds, internalTime.nanoseconds);
-	if(DM_MSGS) INFO("DM: issueSyncSingle timestamp (timestamp) %us %dns\n",
-		 originTimestamp.secondsField, originTimestamp.nanosecondsField);
-
 	msgPackSync(ptpClock->msgObuf,*sequenceId,&originTimestamp,ptpClock);
 
-	// DM: use packetLength variable, add size of securityTLV if security is on
+	/* use packetLength variable, add size of securityTLV if security is on */
 	UInteger16 packetLength = SYNC_LENGTH;
 
 #ifdef PTPD_SECURITY
@@ -3484,7 +3469,6 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 		DBGV("Sync MSG sent ! \n");
 
 #ifdef SO_TIMESTAMPING
-		if(DM_MSGS) INFO("DM: pcapEvent: %d, txTimestampFailure: %d\n", ptpClock->netPath.pcapEvent, ptpClock->netPath.txTimestampFailure);
 #ifdef PTPD_PCAP
 		if((ptpClock->netPath.pcapEvent == NULL) && !ptpClock->netPath.txTimestampFailure) {
 #else
@@ -3495,7 +3479,6 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 				if (respectUtcOffset(rtOpts, ptpClock) == TRUE) {
 					internalTime.seconds += ptpClock->timePropertiesDS.currentUtcOffset;
 				}
-				if(DM_MSGS) INFO("DM: processSyncFromSelf about to get called from issueSyncSingle\n");
 				processSyncFromSelf(&internalTime, rtOpts, ptpClock, dst, *sequenceId);
 			}
 		}

@@ -231,14 +231,18 @@ typedef enum IntegrityAlgTyp {
 	GMAC_AES256
 } IntegrityAlgTyp;
 
-/* see dep/configdefaults.c loadDefaultSettings for currently hardcoded / default values */
+/*
+ * SecurityOpts struct holds security parameters that - in a future implementation that integrates with a key mgmt
+ * scheme - would be provided by a security association (SA). In the current emulation, these security parameters are
+ * simply read in from a .conf configuration file (see /dep/daemonconfig.c). Parameters that are read in as hex strings
+ * have a corresponding char <param>String[size * 2 + 1] member
+ */
 typedef struct {
  	/*
      * length of overall securityTLV (including Type and Length i.e. payload + 4
-     * this will only be learned after checking the SA (in this emulation, the config file) for variable fields
+     * this is the length of the TLV constant fields (10) + ICV length + optional fields i.e. disclosedKey
      */
 	UInteger16 secTLVLen;
-
 
     /* security parameter pointer; enables querying the SAD for the relevant SA */
     UInteger8 SPP;
@@ -257,7 +261,6 @@ typedef struct {
 	 * 32 bytes, need 64 chars and +1 for null byte
 	 */
 	char keyString[MAX_SEC_KEY_LEN * 2 + 1];
-
 
     /* key disclosure delay, emulated as a boolean so sender knows when to include a disclosed key */
 	Boolean disclosureDelay;

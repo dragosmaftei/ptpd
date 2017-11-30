@@ -1531,8 +1531,6 @@ packMsgHeader(MsgHeader *h, Octet *buf)
 void
 unpackManagementTLV(Octet *buf, int baseOffset, MsgManagement *m, PtpClock* ptpClock)
 {
-    if(DM_MSGS) INFO("DM: unpackManagementTLV starting\n");
-
 	int offset = 0;
 	XMALLOC(m->tlv, sizeof(ManagementTLV));
 	/* read the management TLV */
@@ -1545,8 +1543,6 @@ unpackManagementTLV(Octet *buf, int baseOffset, MsgManagement *m, PtpClock* ptpC
 void
 packManagementTLV(ManagementTLV *tlv, Octet *buf)
 {
-    if(DM_MSGS) INFO("DM: packManagementTLV starting\n");
-
 	int offset = 0;
 	#define OPERATE( name, size, type ) \
 		pack##type( &tlv->name, buf + MANAGEMENT_LENGTH + offset ); \
@@ -1607,8 +1603,6 @@ void unpackMsgManagement(Octet *buf, MsgManagement *m, PtpClock *ptpClock)
 void
 unpackSignalingTLV(Octet *buf, MsgSignaling *m, PtpClock* ptpClock)
 {
-    if(DM_MSGS) INFO("DM: unpackSignalingTLV starting\n");
-
 	int offset = 0;
 	XMALLOC(m->tlv, sizeof(SignalingTLV));
 	/* read the signaling TLV */
@@ -1621,8 +1615,6 @@ unpackSignalingTLV(Octet *buf, MsgSignaling *m, PtpClock* ptpClock)
 void
 packSignalingTLV(SignalingTLV *tlv, Octet *buf)
 {
-    if(DM_MSGS) INFO("DM: packSignalingTLV\n");
-
 	int offset = 0;
 	#define OPERATE( name, size, type ) \
 		pack##type( &tlv->name, buf + SIGNALING_LENGTH + offset ); \
@@ -1686,8 +1678,6 @@ unpackMsgSignaling(Octet *buf, MsgSignaling *m, PtpClock *ptpClock)
 void
 msgUnpackHeader(Octet * buf, MsgHeader * header)
 {
-    if(DM_MSGS) INFO("DM: msgUnpackHeader starting\n");
-
 	header->transportSpecific = (*(Nibble *) (buf + 0)) >> 4;
 	header->messageType = (*(Enumeration4 *) (buf + 0)) & 0x0F;
 	header->versionPTP = (*(UInteger4 *) (buf + 1)) & 0x0F;
@@ -1767,16 +1757,17 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
      * we've "used policy limiting fields to query the SPD" (i.e. in this emulation, just checked 'securityEnabled'),
      * and the query "returned an SPP to query SAD to obtain the relevant SA which contains other security paramaters",
      * (i.e. in this emulation, the parameters were read in from config file)... these parameters include:
-     * imm/delayed, keyID, key, keyLen, algType (and thus ICV length), and for delayed, a key disclosure delay (not
-     * currently included in the emulation); using these parameters, we can figure out the securityTLVs actual length
-     * - constant fields in TLV = 10
-     * - ICV (length K) is determined by algType
-     * - if delayed, key disclosure delay should indicate whether this message needs to include a disclosed key (len D)
-     * - length is then 10 + D + K
+     * imm/delayed, keyID, key, keyLen, algType (and thus ICV length), total TLV length (variable based on ICV length)
+     * NOT including optional fields, and for delayed, a key disclosure delay;
+     * thus to get the actual total TLV length, we just pull down the length stored in the SA / securityOpts (constant
+     * fields + ICV length), and account for the disclosed key if applicable (signalled by the key disclosure delay)
      */
 
+    /*
+     * only this is pulled down into a local variable (as opposed to being accessed through rtOpts->securityOpts) since
+     * it might get adjusted for optional fields on a per message basis depending on the key disclosure delay
+     */
     UInteger16 secTLVLen = rtOpts->securityOpts.secTLVLen;
-
     /*
      * if delayed processing, check key disclosure delay to see if we need to include a disclosed key
      * emulated here very simply for proof of concept as a boolean, but in reality some other mechanism would apply
@@ -1787,12 +1778,9 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
     } /* else, either not delayed, or delayed, but don't need to disclose key in this TLV, so don't adjust len */
 
 
-    /* adding security flag to the header */
-    *(UInteger8 *) (buf + 6) |= PTP_SECURITY;
+    *(UInteger8 *) (buf + 6) |= PTP_SECURITY; /* adding security flag to the header */
 
-    /* get message length out from the header */
-    UInteger16  msg_len = flip16(*(UInteger16 *) (buf + 2));
-//    if(DM_MSGS) INFO("DM: pulled out msg length: %d\n", msg_len);
+    UInteger16  msg_len = flip16(*(UInteger16 *) (buf + 2)); /* get message length out from the header */
     /* adjusting the header's message length field to account for sec TLV */
     *(UInteger16 *) (buf + 2) = flip16(msg_len + secTLVLen);
 
@@ -1803,12 +1791,10 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
     sec_tlv.lengthField = secTLVLen - 4; /* -4 to discount TYPE and LENGTH (2 bytes each) */
     sec_tlv.SPP = rtOpts->securityOpts.SPP;
     sec_tlv.keyID = rtOpts->securityOpts.keyID;
-
     /* if disclosed key needs to be included, this must be indicated in the secParamIndicator's disclosedKey bit */
     if (rtOpts->securityOpts.delayed && rtOpts->securityOpts.disclosureDelay) {
         sec_tlv.secParamIndicator |= SPI_DISCLOSED_KEY;
     } /* else this flag will remain 0, as the whole sec_tlv was initialized to 0 */
-
 
     /*
      * pack the buffer with what we have so far for the TLV; avoiding the padding inherent in structs
@@ -1837,8 +1823,6 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
 
     /* calculate ICV from buffer, then pack it directly in the buffer */
     unsigned char *static_digest;
-
-//    if(DM_MSGS) INFO("DM: SECURITY ENABLED, key is: %s (strlen: %d)\n", rtOpts->securityOpts.key, strlen(rtOpts->securityOpts.key));
 
     /*
 	 * want from header all the way up to ICV, so:
@@ -1875,8 +1859,6 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
 void
 msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, PtpClock * ptpClock)
 {
-    if(DM_MSGS) INFO("DM: msgPackSync starting\n");
-
 	msgPackHeader(buf, ptpClock);
 
 	/* changes in header */
@@ -1909,8 +1891,6 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
 void
 msgUnpackSync(Octet * buf, MsgSync * sync)
 {
-    if(DM_MSGS) INFO("DM: msgUnpackSync starting\n");
-
 	sync->originTimestamp.secondsField.msb =
 		flip16(*(UInteger16 *) (buf + 34));
 	sync->originTimestamp.secondsField.lsb =
@@ -2324,8 +2304,6 @@ msgUnpackPdelayRespFollowUp(Octet * buf, MsgPdelayRespFollowUp * prespfollow)
 void
 msgPackManagementTLV(Octet *buf, MsgManagement *outgoing, PtpClock *ptpClock)
 {
-    if(DM_MSGS) INFO("DM: msgPackManagementTLV starting\n");
-
         DBGV("packing ManagementTLV message \n");
 
 	UInteger16 dataLength = 0;
