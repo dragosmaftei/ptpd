@@ -478,7 +478,6 @@ enum {
 
 #ifdef PTPD_SECURITY
 /* security constants */
-#define SEC_TLV_IMM_HMACSHA256_LEN 26
 /* length of sec TLV including only constant fields (not including optional fields or ICV) */
 #define SEC_TLV_CONSTANT_LEN 10
 #define MAX_SEC_KEY_LEN 32 /* 32 for HMAC, 16 for GMAC */

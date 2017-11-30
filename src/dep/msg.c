@@ -1804,7 +1804,8 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
 
     /* pack the disclosed key if necessary */
     if (rtOpts->securityOpts.delayed && rtOpts->securityOpts.disclosureDelay) {
-        /* add disclosed key at 10th byte offset */
+        /* add disclosed key at 10th byte offset... just 0xdds for testing */
+        memset(buf + msg_len + SEC_TLV_CONSTANT_LEN, 0xdd, rtOpts->securityOpts.keyLen);
     }
 
     /*
