@@ -1477,8 +1477,6 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
 			UInteger16 secTLVLen = rtOpts->securityOpts.secTLVLen;
 
-            INFO("DM: processMessage, inc tlv SPI: %01x, SPI_DISCLOSED_KEY: %01x, anded: %01x\n",
-                sec_tlv.secParamIndicator, SPI_DISCLOSED_KEY, (sec_tlv.secParamIndicator & SPI_DISCLOSED_KEY));
 			/* if delayed processing, check SPI for flag indicating the presence of the disclosed key */
 			if (rtOpts->securityOpts.delayed &&
 				((sec_tlv.secParamIndicator & SPI_DISCLOSED_KEY) == SPI_DISCLOSED_KEY)) {
@@ -1486,7 +1484,6 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                  * we're using delayed processing, and the SPI indicates that this TLV contains a disclosed key
                  * so adjust length accordingly (add key length)
                  */
-                INFO("DM: processMessage, adding key len to secTLVlen\n");
 				secTLVLen += rtOpts->securityOpts.keyLen;
 
 			} /* else, either not delayed, or delayed, but no disclosed key in this TLV, so don't adjust len */
@@ -1496,8 +1493,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			 * check error condition first so we can just return
 			 */
 
-			INFO("DM: processMessage, about to do the check... secops: %d, inc tlv: %d\n", rtOpts->securityOpts.secTLVLen, sec_tlv.lengthField);
-			if (rtOpts->securityOpts.secTLVLen != sec_tlv.lengthField + 4) {
+			if (secTLVLen != sec_tlv.lengthField + 4) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.lengthMismatchErrors++;
 				if (DM_MSGS)
