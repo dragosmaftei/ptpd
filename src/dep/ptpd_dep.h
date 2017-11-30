@@ -338,7 +338,7 @@ UInteger16 packSMAcknowledgeCancelUnicastTransmission( MsgSignaling*, Octet*);
 /* DM: Security TLV packing / unpacking */
 #ifdef PTPD_SECURITY
 void msgUnpackSecurityTLV(Octet * buf, SecurityTLV *data, PtpClock *ptpClock);
-void addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts);
+UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts);
 #endif /* PTPD_SECURITY */
 
 void unpackPortAddress( Octet* buf, PortAddress*, PtpClock*);

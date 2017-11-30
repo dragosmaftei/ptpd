@@ -1380,7 +1380,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
     }
 
     msgUnpackHeader(ptpClock->msgIbuf, &ptpClock->msgTmpHeader);
-#define PTPD_SECURITY
+//#define PTPD_SECURITY
 #ifdef PTPD_SECURITY
 
 #ifdef RUNTIME_DEBUG
@@ -1437,126 +1437,150 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
              */
             msgUnpackSecurityTLV(ptpClock->msgIbuf + packetLength, &sec_tlv, ptpClock);
 
-            /* the security flag IS set; now verify TYPE field in TLV is security */
-            if (sec_tlv.tlvType == SECURITY) {
-                /*
-                 * at this point we've emulated an SPD lookup to yield an SPP (in config file), we verified the
-                 * incoming message has the security flag set, and verified TLV type is security, so now we can
-                 * safely extract other fields from the TLV
+			/*
+			 * we know the security flag is set; now verify TYPE field in TLV is SECURITY
+			 * check error condition first so we can just return
+			 */
+			if (sec_tlv.tlvType != SECURITY) {
+				ptpClock->counters.securityErrors++;
+				ptpClock->counters.securityTLVExpectedErrors++;
+				if (DM_MSGS)
+					INFO("DM: security enabled, security flag set, but TLV type not correct on seqid %04x\n",
+						 ptpClock->msgTmpHeader.sequenceId);
+				return;
+			}
+
+			/*
+             * at this point we've emulated an SPD lookup to yield an SPP (in config file), we verified the
+             * incoming message has the security flag set, and verified TLV type is security, so now we can
+             * safely extract other fields from the TLV
+             */
+
+			/*
+             * verify that the SPP we got from "querying the SPD" (in this emulation, the SPP is simply stored in
+             * the config file) matches the SPP on the incoming message's security TLV
+             * check error condition first so we can just return
+             */
+			if (sec_tlv.SPP != rtOpts->securityOpts.SPP) {
+				ptpClock->counters.securityErrors++;
+				ptpClock->counters.SPPMismatchErrors++;
+				if (DM_MSGS)
+					INFO("DM: SPP mismatch on seqid %04x\n",
+						 ptpClock->msgTmpHeader.sequenceId);
+				return;
+			}
+
+			/*
+             * now that we've verified the SPP, we can use it to query the SAD and get the relevant SA, which
+             * contains other necessary parameters: imm/delayed, keyID, key, keylen, algType (and thus ICV length)
+             * only at this point can we know the actual length of the securityTLV:
+             * - if delayed, check secParamIndicator to find out whether TLV contains disclosedKey (size: D)
+             * -- if it does, then we can calculate D = keyLen
+             * - ICV size (K) is determined by algType
+             * - thus, securityTLV length should be 10 + D + K
+             *
+             * this calculated length based on the security parameters from our SA should match lengthField
+             * of incoming TLV
+             */
+
+			UInteger16 secTLVLen = rtOpts->securityOpts.secTLVLen;
+
+			/* if delayed processing, check SPI for flag indicating the presence of the disclosed key */
+			if (rtOpts->securityOpts.delayed &&
+				((sec_tlv.secParamIndicator & SPI_DISCLOSED_KEY) == SPI_DISCLOSED_KEY)) {
+				/*
+                 * we're using delayed processing, and the SPI indicates that this TLV contains a disclosed key
+                 * so adjust length accordingly (add key length)
                  */
+				secTLVLen += rtOpts->securityOpts.keyLen;
 
-                /*
-                 * verify that the SPP we got from "querying the SPD" (in this emulation, the SPP is simply stored in
-                 * the config file) matches the SPP on the incoming message's security TLV
-                 */
-                if (sec_tlv.SPP == rtOpts->securityOpts.SPP) {
-					/*
-					 * now that we've verified the SPP, we can use it to query the SAD and get the relevant SA, which
-					 * contains other necessary parameters: imm/delayed, keyID, key, keylen, algType (and thus ICV length)
-					 * only at this point can we know the actual length of the securityTLV:
-					 * - if delayed, check secParamIndicator to find out whether TLV contains disclosedKey (size: D)
-					 * -- if it does, then we can calculate D = keyLen
-					 * - ICV size (K) is determined by algType
-					 * - thus, securityTLV length should be 10 + D + K
-					 *
-					 * this calculated length based on the security parameters from our SA should match lengthField
-					 * of incoming TLV
-					 */
+			} /* else, either not delayed, or delayed, but no disclosed key in this TLV, so don't adjust len */
 
-					rtOpts->securityOpts.secTLVLen = SEC_TLV_CONSTANT_LEN + rtOpts->securityOpts.icvLength;
+			/*
+			 * now verify our calculated length is the same as the incoming message's TLV's length field
+			 * check error condition first so we can just return
+			 */
+			if (rtOpts->securityOpts.secTLVLen != sec_tlv.lengthField + 4) {
+				ptpClock->counters.securityErrors++;
+				ptpClock->counters.lengthMismatchErrors++;
+				if (DM_MSGS)
+					INFO("DM: length mismatch on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+				return;
+			}
 
-                    /* if delayed processing, check SPI for flag indicating the presence of the disclosed key */
-                    if (rtOpts->securityOpts.delayed &&
-                            ((sec_tlv.secParamIndicator & SPI_DISCLOSED_KEY) == SPI_DISCLOSED_KEY)) {
-                        /*
-                         * we're using delayed processing, and the SPI indicates that this TLV contains a disclosed key
-                         * so adjust length accordingly (add key length)
-                         */
-                        rtOpts->securityOpts.secTLVLen += rtOpts->securityOpts.keyLen;
+			/*
+			 * now verify that the keyID from our "SA" (i.e. config file in this emulation) is the same as the
+			 * incoming message's TLV's keyID field; check error condition first so we can just return
+			 */
+			if (rtOpts->securityOpts.keyID != sec_tlv.keyID) {
+				ptpClock->counters.securityErrors++;
+				ptpClock->counters.keyIDMismatchErrors++;
+				if (DM_MSGS)
+					INFO("DM: keyID mismatch on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+				return;
+			}
 
-                    } /* else, either not delayed, or delayed, but no disclosed key in this TLV, so don't adjust len */
-
-					/* now verify our calculated length is the same as the incoming message's TLV's length field */
-					if (rtOpts->securityOpts.secTLVLen == sec_tlv.lengthField + 4) {
+			/*
+             * REPLAY ATTACK CHECK
+             */
 
 
-						/* TODO GOT LENGTH, CHECK KEY ID, THEN REPLAY ATTACK CHECK, THEN ICV CALCULATION..
-						 * TODO RESTRUCTURE: DO ERROR CONDITION FIRST TO AVOID HUGE NESTED IFS */
+			/*
+             * if delayed processing, save correction field and zero it out before calculating ICV
+             * fill it back in the buffer later
+             */
+			Integer64 correctionFieldTmp;
+			if (rtOpts->securityOpts.delayed ||
+				(!rtOpts->securityOpts.delayed && rtOpts->securityOpts.immIgnoreCorrection)) {
+				memcpy(&correctionFieldTmp.msb, (ptpClock->msgIbuf + 8), 4);
+				memcpy(&correctionFieldTmp.lsb, (ptpClock->msgIbuf + 12), 4);
+				/* don't need to flip the values copied into correctionFieldTmp since they won't be interpreted/used */
+				memset(ptpClock->msgIbuf + 8, 0, 8); /* zero out the correction field */
+			}
 
 
-						/*
-                         * if delayed processing, save correction field and zero it out before calculating ICV
-                         * fill it back in the buffer later
-                         */
-						Integer64 correctionFieldTmp;
-						/* should this check be from rtOpts or from the received message's TLV? */
-						if (rtOpts->securityOpts.delayed ||
-							(!rtOpts->securityOpts.delayed && rtOpts->securityOpts.immIgnoreCorrection)) {
-							memcpy(&correctionFieldTmp.msb, (ptpClock->msgIbuf + 8), 4);
-							memcpy(&correctionFieldTmp.lsb, (ptpClock->msgIbuf + 12), 4);
-							/* don't need to flip the values copied into correctionFieldTmp since they won't be interpreted/used */
-							memset(ptpClock->msgIbuf + 8, 0, 8); // zero out the correction field
-						}
 
-						unsigned char *static_digest;
+			unsigned char *static_digest;
 
-						/* want from header all the way up to ICV, so packetlength, + TLV (26) - ICV (16) */
-						static_digest = dm_HMAC(dm_EVP_sha256(), rtOpts->securityOpts.key, rtOpts->securityOpts.keyLen,
-												(unsigned char *) ptpClock->msgIbuf,
-												packetLength + SEC_TLV_CONSTANT_LEN,
-												NULL, NULL);
+			/*
+			 * want from header all the way up to ICV, so:
+			 * packetlength + total TLV length (variable but already calculated) - ICV length (variable)
+			 * calculating it this way accounts for different alg types, as well as for the disclosed key, if present,
+			 * if doing delayed processing
+			 */
+			static_digest = dm_HMAC(dm_EVP_sha256(), rtOpts->securityOpts.key, rtOpts->securityOpts.keyLen,
+									(unsigned char *) ptpClock->msgIbuf,
+									packetLength + secTLVLen - rtOpts->securityOpts.icvLength,
+									NULL, NULL);
 
-						/*
-                         * ICV gets truncated to 128 bits, so compare only 16 bytes
-                         * msgIbuf + packetLength is the start of the secTLV, + SEC_TLV_CONSTANT_LEN is start of ICV (if imm)
-                         */
-						// TODO change magic number to an icv length variable
-						if (memcmp(static_digest, ptpClock->msgIbuf + packetLength + SEC_TLV_CONSTANT_LEN, 16)) {
-							ptpClock->counters.securityErrors++;
-							ptpClock->counters.icvMismatchErrors++;
-							if (DM_MSGS)
-								INFO("DM: icv's DIDNT MATCH on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
-							return;
-						}
+			/*
+             * ICV gets truncated to 128 bits, so compare only 16 bytes
+             * msgIbuf + packetLength is the start of the secTLV, + total TLV len - ICV len = start of ICV
+             */
+			if (memcmp(static_digest,
+					   ptpClock->msgIbuf + packetLength + secTLVLen - rtOpts->securityOpts.icvLength,
+					   rtOpts->securityOpts.icvLength)) {
+				ptpClock->counters.securityErrors++;
+				ptpClock->counters.icvMismatchErrors++;
+				if (DM_MSGS)
+					INFO("DM: icv's DIDNT MATCH on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+				return;
+			}
 
-						/*
-                         * for TESLA, restore correctionField to its previous value before it was zeroed out (might not even be
-                         * strictly necessary since the header information from msgIbuf was already pulled out into msgTmpHeader
-                         */
-						if (rtOpts->securityOpts.delayed ||
-							(!rtOpts->securityOpts.delayed && rtOpts->securityOpts.immIgnoreCorrection)) {
-							memcpy((ptpClock->msgIbuf + 8), &correctionFieldTmp.msb, 4);
-							memcpy((ptpClock->msgIbuf + 12), &correctionFieldTmp.lsb, 4);
-						}
-					}
-					/* incoming message's security TLV's length field does not match our calculated length */
-					else {
-						ptpClock->counters.securityErrors++;
-						ptpClock->counters.lengthMismatchErrors++;
-						if (DM_MSGS)
-							INFO("DM: length mismatch on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
-						return;
-					}
-                }
-                /* incoming message's security TLV's SPP does not match the SPP given by our "SPD query" */
-                else {
-					ptpClock->counters.securityErrors++;
-					ptpClock->counters.SPPMismatchErrors++;
-					if (DM_MSGS)
-						INFO("DM: SPP mismatch on seqid %04x\n",
-							 ptpClock->msgTmpHeader.sequenceId);
-					return;
-                }
-            }
-            /* the security flag was set, but the bytes corresponding to the TLV type field are not SECURITY */
-            else {
-                ptpClock->counters.securityErrors++;
-                ptpClock->counters.securityTLVExpectedErrors++;
-                if (DM_MSGS)
-                    INFO("DM: security enabled, security flag set, but TLV type not correct on seqid %04x\n",
-                         ptpClock->msgTmpHeader.sequenceId);
-                return;
-            }
+
+
+			/*
+             * for delayed, restore correctionField to its previous value before it was zeroed out (might not even be
+             * strictly necessary since the header information from msgIbuf was already pulled out into msgTmpHeader
+             */
+			if (rtOpts->securityOpts.delayed ||
+				(!rtOpts->securityOpts.delayed && rtOpts->securityOpts.immIgnoreCorrection)) {
+				memcpy((ptpClock->msgIbuf + 8), &correctionFieldTmp.msb, 4);
+				memcpy((ptpClock->msgIbuf + 12), &correctionFieldTmp.lsb, 4);
+			}
+
+
+
 		}
         /*
          * our emulated SPD query indicated that this message should be processed for security, but the message is
@@ -3288,11 +3312,14 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
 		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
 #endif /* RUNTIME_DEBUG */
 
+	/*
+     * 'securityEnabled' emulates getting the policy limiting fields from the PTP header and quering the SPD to
+     * answer the question 'do we want security processing on this packet?' if yes, the query would return an SPP
+     * which would be used to query the SAD to get the relevant SA, which contains necessary security parameters
+     */
     if (rtOpts->securityEnabled) {
-        // in dep/msg.c
-        addSecurityTLV(ptpClock->msgObuf, rtOpts);
-        // DM: add size of sec tlv to the length of the packet to send
-        packetLength += SEC_TLV_IMM_HMACSHA256_LEN;
+        /* add security TLV, returns size, add it to length of the packet to send */
+        packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
     }
 
 #ifdef RUNTIME_DEBUG
@@ -3432,10 +3459,8 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 #endif /* RUNTIME_DEBUG */
 
 	if (rtOpts->securityEnabled) {
-		/* in dep/msg.c */
-		addSecurityTLV(ptpClock->msgObuf, rtOpts);
-		/* add size of sec tlv to the length of the packet to send */
-		packetLength += SEC_TLV_IMM_HMACSHA256_LEN;
+		/* add security TLV, returns size, add it to length of the packet to send */
+		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3528,10 +3553,8 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 #endif /* RUNTIME_DEBUG */
 
 	if (rtOpts->securityEnabled) {
-		/* in dep/msg.c */
-		addSecurityTLV(ptpClock->msgObuf, rtOpts);
-		/* add size of sec tlv to the length of the packet to send */
-		packetLength += SEC_TLV_IMM_HMACSHA256_LEN;
+		/* add security TLV, returns size, add it to length of the packet to send */
+		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3689,10 +3712,8 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 #endif /* RUNTIME_DEBUG */
 
 	if (rtOpts->securityEnabled) {
-		/* in dep/msg.c */
-		addSecurityTLV(ptpClock->msgObuf, rtOpts);
-		/* add size of sec tlv to the length of the packet to send */
-		packetLength += SEC_TLV_IMM_HMACSHA256_LEN;
+		/* add security TLV, returns size, add it to length of the packet to send */
+		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3774,10 +3795,8 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 #endif /* RUNTIME_DEBUG */
 
 	if (rtOpts->securityEnabled) {
-		/* in dep/msg.c */
-		addSecurityTLV(ptpClock->msgObuf, rtOpts);
-		/* add size of sec tlv to the length of the packet to send */
-		packetLength += SEC_TLV_IMM_HMACSHA256_LEN;
+		/* add security TLV, returns size, add it to length of the packet to send */
+		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3873,10 +3892,8 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 #endif /* RUNTIME_DEBUG */
 
 	if (rtOpts->securityEnabled) {
-		/* in dep/msg.c */
-		addSecurityTLV(ptpClock->msgObuf, rtOpts);
-		/* DM: add size of sec tlv to the length of the packet to send */
-		packetLength += SEC_TLV_IMM_HMACSHA256_LEN;
+		/* add security TLV, returns size, add it to length of the packet to send */
+		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
 	}
 
 #ifdef RUNTIME_DEBUG

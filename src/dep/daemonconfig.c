@@ -1027,10 +1027,10 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
                                    PTPD_RESTART_NONE, rtOpts->securityOpts.keyIDString, sizeof(rtOpts->securityOpts.keyIDString), rtOpts->securityOpts.keyIDString,
                                    "4 byte key id value");
 
-    /* security parameter indicator value in ascii rep of hex values */
-    parseResult &= configMapString(opCode, opArg, dict, target, "security:sec_param_indicator",
-                                   PTPD_RESTART_NONE, rtOpts->securityOpts.secParamIndicatorString, sizeof(rtOpts->securityOpts.secParamIndicatorString),
-                                   rtOpts->securityOpts.secParamIndicatorString, "1 byte security parameter indicator");
+    /* key disclosure delay, emulated here as just a boolean so sender knows when a TLV needs to include the disclosed key */
+    parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:disclosure_delay", PTPD_RESTART_NONE,
+                                    &rtOpts->securityOpts.disclosureDelay, rtOpts->securityOpts.disclosureDelay,
+                                    "Emulation of key disclosure delay as boolean to indicate that the disclosed key must be included in the TLV.");
 
     /* when security is enabled and in master state, accept and process insecure messages (messages w/out security bit flipped) */
     parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:master_accept_insecure_announce", PTPD_RESTART_NONE,
@@ -1067,7 +1067,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
     printf("the keystring size is (should always be this): %lu\n", sizeof(rtOpts->securityOpts.keyString));
     printf("the keystring STRLEN is: %lu\n", strlen(rtOpts->securityOpts.keyString));
     printf("the keyString is:\n\t");
-    for (int i = 0; i < (sizeof(rtOpts->securityOpts.keyString) + 1); i++)
+    for (int i = 0; i < (sizeof(rtOpts->securityOpts.keyString)); i++)
         printf("0x%02x ", rtOpts->securityOpts.keyString[i]);
 	printf("\n");
 
@@ -1086,6 +1086,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 		if (memcmp(HMAC_SHA256_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(HMAC_SHA256_OID) - 1) == 0) {
 		    rtOpts->securityOpts.integrityAlgTyp = HMAC_SHA256;
             rtOpts->securityOpts.icvLength = 16;
+            rtOpts->securityOpts.secTLVLen = SEC_TLV_CONSTANT_LEN + 16;
         } else if (memcmp(GMAC_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(GMAC_OID) - 1) == 0) {
             rtOpts->securityOpts.integrityAlgTyp = GMAC_AES256;
             /*
@@ -1093,6 +1094,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
              * that it gets generated with... thus icvLength will include the IV length, i.e. IV(12) + tag(16) = 28
              */
             rtOpts->securityOpts.icvLength = 28;
+            rtOpts->securityOpts.secTLVLen = SEC_TLV_CONSTANT_LEN + 28;
         } else {
             // TODO make this print to correct error log
             printf("algorithm OID provided does not match, using HMAC as default\n");
@@ -1112,18 +1114,17 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 
 		rtOpts->securityOpts.SPP =  (UInteger8) strtoul(rtOpts->securityOpts.SPPString, 0, 16); // base 16
         rtOpts->securityOpts.keyID =  (UInteger32) strtoul(rtOpts->securityOpts.keyIDString, 0, 16); // base 16
-        rtOpts->securityOpts.secParamIndicator =  (Octet) strtoul(rtOpts->securityOpts.secParamIndicatorString, 0, 16); // base 16
 
         /* set the key length based on the inputted key string from the config file */
         rtOpts->securityOpts.keyLen = strlen(rtOpts->securityOpts.keyString) / 2;
     }
 
     printf("the key is (length: %d):\n\t", rtOpts->securityOpts.keyLen);
-    for (int i = 0; i < 33; i++) {
+    for (int i = 0; i < 32; i++) {
         printf("0x%02x ", rtOpts->securityOpts.key[i]);
     }
-    printf("\nSPP: %02x\nkeyid: %08x\nsecparamind: %02x\n",
-           rtOpts->securityOpts.SPP, rtOpts->securityOpts.keyID, rtOpts->securityOpts.secParamIndicator);
+    printf("\nSPP: %02x\nkeyid: %08x\n",
+           rtOpts->securityOpts.SPP, rtOpts->securityOpts.keyID);
 
 #endif /* PTPD_SECURITY */
 

@@ -1761,8 +1761,32 @@ void msgPackSecurityTLV(SecurityTLV *data, Octet *buf)
  * buf is the output buffer
  * this should be called after the buffer has been packed (including header) for the type of message
  */
-void addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
+UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
 {
+    /*
+     * we've "used policy limiting fields to query the SPD" (i.e. in this emulation, just checked 'securityEnabled'),
+     * and the query "returned an SPP to query SAD to obtain the relevant SA which contains other security paramaters",
+     * (i.e. in this emulation, the parameters were read in from config file)... these parameters include:
+     * imm/delayed, keyID, key, keyLen, algType (and thus ICV length), and for delayed, a key disclosure delay (not
+     * currently included in the emulation); using these parameters, we can figure out the securityTLVs actual length
+     * - constant fields in TLV = 10
+     * - ICV (length K) is determined by algType
+     * - if delayed, key disclosure delay should indicate whether this message needs to include a disclosed key (len D)
+     * - length is then 10 + D + K
+     */
+
+    UInteger16 secTLVLen = rtOpts->securityOpts.secTLVLen;
+
+    /*
+     * if delayed processing, check key disclosure delay to see if we need to include a disclosed key
+     * emulated here very simply for proof of concept as a boolean, but in reality some other mechanism would apply
+     */
+    if (rtOpts->securityOpts.delayed && rtOpts->securityOpts.disclosureDelay) {
+        /* adjust length accordingly (add key length) */
+        secTLVLen += rtOpts->securityOpts.keyLen;
+    } /* else, either not delayed, or delayed, but don't need to disclose key in this TLV, so don't adjust len */
+
+
     /* adding security flag to the header */
     *(UInteger8 *) (buf + 6) |= PTP_SECURITY;
 
@@ -1770,21 +1794,32 @@ void addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
     UInteger16  msg_len = flip16(*(UInteger16 *) (buf + 2));
 //    if(DM_MSGS) INFO("DM: pulled out msg length: %d\n", msg_len);
     /* adjusting the header's message length field to account for sec TLV */
-    *(UInteger16 *) (buf + 2) = flip16(msg_len + SEC_TLV_IMM_HMACSHA256_LEN);
+    *(UInteger16 *) (buf + 2) = flip16(msg_len + secTLVLen);
 
     /* make TLV struct and populate it before packing the buffer */
     SecurityTLV sec_tlv;
+    memset(&sec_tlv, 0, sizeof(SecurityTLV));
     sec_tlv.tlvType = SECURITY;
-    sec_tlv.lengthField = rtOpts->securityOpts.lengthField;
+    sec_tlv.lengthField = secTLVLen - 4; /* -4 to discount TYPE and LENGTH (2 bytes each) */
     sec_tlv.SPP = rtOpts->securityOpts.SPP;
     sec_tlv.keyID = rtOpts->securityOpts.keyID;
-    sec_tlv.secParamIndicator = rtOpts->securityOpts.secParamIndicator;
+
+    /* if disclosed key needs to be included, this must be indicated in the secParamIndicator's disclosedKey bit */
+    if (rtOpts->securityOpts.delayed && rtOpts->securityOpts.disclosureDelay) {
+        sec_tlv.secParamIndicator |= SPI_DISCLOSED_KEY;
+    } /* else this flag will remain 0, as the whole sec_tlv was initialized to 0 */
+
 
     /*
-     * pack the buffer to avoid the padding inherent in structs
-     * start at end of sync message
+     * pack the buffer with what we have so far for the TLV; avoiding the padding inherent in structs
+     * start at end of message (i.e. buf + msg_len)
      */
     msgPackSecurityTLV(&sec_tlv, buf + msg_len);
+
+    /* pack the disclosed key if necessary */
+    if (rtOpts->securityOpts.delayed && rtOpts->securityOpts.disclosureDelay) {
+        /* add disclosed key at 10th byte offset */
+    }
 
     /*
      * if delayed processing, save correction field and zero it out before calculating ICV
@@ -1800,25 +1835,25 @@ void addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
         memset(buf + 8, 0, 8); // zero out the correction field
     }
 
-
-
     /* calculate ICV from buffer, then pack it directly in the buffer */
     unsigned char *static_digest;
 
 //    if(DM_MSGS) INFO("DM: SECURITY ENABLED, key is: %s (strlen: %d)\n", rtOpts->securityOpts.key, strlen(rtOpts->securityOpts.key));
 
     /*
-     * want from header all the way up to ICV, so
-     * 44 for SYNCLENGTH, + length of the constant fields (+ disclosed key if applicable)
-     */
+	 * want from header all the way up to ICV, so:
+	 * msg_len + total TLV length (variable but already calculated) - ICV length (variable)
+	 * calculating it this way accounts for different alg types, as well as for the disclosed key, if present,
+	 * if doing delayed processing
+	 */
     static_digest = dm_HMAC(dm_EVP_sha256(), rtOpts->securityOpts.key, rtOpts->securityOpts.keyLen,
-                            (unsigned char *) buf, msg_len + SEC_TLV_CONSTANT_LEN,
+                            (unsigned char *) buf,
+                            msg_len + secTLVLen - rtOpts->securityOpts.icvLength,
                             NULL, NULL);
 
     /* truncate the digest to 128 bits and pack it by copying just 16 bytes directly into the buffer */
-    memcpy(buf + msg_len + SEC_TLV_CONSTANT_LEN, static_digest, 16);
-
-
+    memcpy(buf + msg_len + secTLVLen - rtOpts->securityOpts.icvLength,
+           static_digest, rtOpts->securityOpts.icvLength);
 
     /*
      * for delayed (or if imm but ignoring correction field),
@@ -1829,6 +1864,8 @@ void addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
         memcpy((buf + 8), &correctionFieldTmp.msb, 4);
         memcpy((buf + 12), &correctionFieldTmp.lsb, 4);
     }
+
+    return secTLVLen;
 }
 
 #endif /* PTPD_SECURITY */

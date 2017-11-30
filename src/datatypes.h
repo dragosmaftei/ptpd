@@ -233,10 +233,7 @@ typedef enum IntegrityAlgTyp {
 
 /* see dep/configdefaults.c loadDefaultSettings for currently hardcoded / default values */
 typedef struct {
-    /* length of overall securityTLV payload i.e. length of the 'value' field */
-    UInteger16 lengthField;
-
-	/*
+ 	/*
      * length of overall securityTLV (including Type and Length i.e. payload + 4
      * this will only be learned after checking the SA (in this emulation, the config file) for variable fields
      */
@@ -261,12 +258,9 @@ typedef struct {
 	 */
 	char keyString[MAX_SEC_KEY_LEN * 2 + 1];
 
-    /*
-     * flags indicating presence of optional fields; per current spec, only 3rd flag is used
-     * to indicate presence of disclosed key (delayed only), i.e. 0x04
-     */
-    Octet secParamIndicator;
-    char secParamIndicatorString[1 * 2 + 1]; // size of secParamIndicator * 2 + 1 for null
+
+    /* key disclosure delay, emulated as a boolean so sender knows when to include a disclosed key */
+	Boolean disclosureDelay;
 
     /*
      * disclosedKey (optional), only for delayed
