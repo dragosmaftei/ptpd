@@ -1377,7 +1377,11 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
     }
 
     msgUnpackHeader(ptpClock->msgIbuf, &ptpClock->msgTmpHeader);
-//#define PTPD_SECURITY
+
+#if DEFINE_SECURITY
+#define PTPD_SECURITY
+#endif /* DEFINE_SECURITY */
+
 #ifdef PTPD_SECURITY
 
 #ifdef RUNTIME_DEBUG
@@ -1532,33 +1536,43 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			}
 
 
+// CALCULATE AND VERIFY ICV
 
-			unsigned char *static_digest;
-
-			/*
-			 * want from header all the way up to ICV, so:
-			 * packetlength + total TLV length (variable but already calculated) - ICV length (variable)
-			 * calculating it this way accounts for different alg types, as well as for the disclosed key, if present,
-			 * if doing delayed processing
-			 */
-			static_digest = dm_HMAC(dm_EVP_sha256(), rtOpts->securityOpts.key, rtOpts->securityOpts.keyLen,
-									(unsigned char *) ptpClock->msgIbuf,
-									packetLength + secTLVLen - rtOpts->securityOpts.icvLength,
-									NULL, NULL);
-
-			/*
-             * ICV gets truncated to 128 bits, so compare only 16 bytes
-             * msgIbuf + packetLength is the start of the secTLV, + total TLV len - ICV len = start of ICV
-             */
-			if (memcmp(static_digest,
-					   ptpClock->msgIbuf + packetLength + secTLVLen - rtOpts->securityOpts.icvLength,
-					   rtOpts->securityOpts.icvLength)) {
+			if (calculateAndVerifyICV(&rtOpts->securityOpts, (unsigned char *)ptpClock->msgIbuf,
+								  packetLength + secTLVLen - rtOpts->securityOpts.icvLength) == FALSE) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.icvMismatchErrors++;
 				if (DM_MSGS)
 					INFO("DM: icv's DIDNT MATCH on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
 				return;
 			}
+
+//			unsigned char *static_digest;
+//
+//			/*
+//			 * want from header all the way up to ICV, so:
+//			 * packetlength + total TLV length (variable but already calculated) - ICV length (variable)
+//			 * calculating it this way accounts for different alg types, as well as for the disclosed key, if present,
+//			 * if doing delayed processing
+//			 */
+//			static_digest = dm_HMAC(dm_EVP_sha256(), rtOpts->securityOpts.key, rtOpts->securityOpts.keyLen,
+//									(unsigned char *) ptpClock->msgIbuf,
+//									packetLength + secTLVLen - rtOpts->securityOpts.icvLength,
+//									NULL, NULL);
+//
+//			/*
+//             * ICV gets truncated to 128 bits, so compare only 16 bytes
+//             * msgIbuf + packetLength is the start of the secTLV, + total TLV len - ICV len = start of ICV
+//             */
+//			if (memcmp(static_digest,
+//					   ptpClock->msgIbuf + packetLength + secTLVLen - rtOpts->securityOpts.icvLength,
+//					   rtOpts->securityOpts.icvLength)) {
+//				ptpClock->counters.securityErrors++;
+//				ptpClock->counters.icvMismatchErrors++;
+//				if (DM_MSGS)
+//					INFO("DM: icv's DIDNT MATCH on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+//				return;
+//			}
 
 
 

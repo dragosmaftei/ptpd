@@ -16,7 +16,11 @@
  */
 
 #define DM_MSGS 1
-//#define PTPD_SECURITY
+#define DEFINE_SECURITY 0
+
+#if DEFINE_SECURITY
+#define PTPD_SECURITY
+#endif /* DEFINE_SECURITY */
 
 #ifndef PTPD_H_
 #define PTPD_H_
