@@ -1748,7 +1748,7 @@ void msgPackSecurityTLV(SecurityTLV *data, Octet *buf)
 }
 
 /*
- * buf is the output buffer
+ * buf is the output buffer (PTP header start)
  * this should be called after the buffer has been packed (including header) for the type of message
  */
 UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
@@ -1864,6 +1864,10 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
     return secTLVLen;
 }
 
+/*
+ *
+ * buf is the start of the PTP header
+ */
 void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteger16 icvOffset) {
 
     IntegrityAlgTyp algTyp = secOpts->integrityAlgTyp;
@@ -1891,23 +1895,29 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
             INFO("SEND doing GMAC\n");
             // TODO ERROR MESSAGES INSTEAD OF PERROR
             /* get random bytes for IV */
-            unsigned char buffer[12];
-            memset(buffer, 0, sizeof(buffer));
+            unsigned char iv[IV_LEN];
+            memset(iv, 0, sizeof(iv));
             FILE *fd;
             if (!(fd = fopen("/dev/urandom", "r")))
                 perror("error opening");
             /* read random bytes from /dev/urandom */
-            int bytes_read = fread(buffer, 1, sizeof(buffer), fd);
-            if (bytes_read != sizeof(buffer))
-                printf("error... only read %d of %lu bytes\n", bytes_read, sizeof(buffer));
+            int bytes_read = fread(iv, 1, sizeof(iv), fd);
+            if (bytes_read != sizeof(iv))
+                printf("error... only read %d of %lu bytes\n", bytes_read, sizeof(iv));
             if (fclose(fd))
                 perror("error closing");
 
             /* call dm_GMAC passing in key, iv, ivlen, data (start of ptp header), data len (up to ICV start)
-             * icv start (+ 12 offset from icvOffset, to account for storing IV) and icv len
+             * icv start / where to place the calculated icv (+ 12 offset from icvOffset, to account for storing IV)
+             * and icv len
              */
+            if (!dm_GMAC(secOpts->key, iv, sizeof(iv), buf, icvOffset,
+                         buf + icvOffset + sizeof(iv), secOpts->icvLength)) {
+                perror("error calculating GMAC");
+            }
+            /* pack IV in buffer at icvOffset so receiver will be able to use same IV to verify ICV */
+            memcpy(buf + icvOffset, iv, sizeof(iv));
 
-            /* pack IV in buffer at icvOffset */
             break;
         default:
             INFO("error, unknown algTyp");
@@ -1915,6 +1925,9 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
     }
 }
 
+/*
+ * buf is the start of PTP header
+ */
 Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, UInteger16 icvOffset) {
     IntegrityAlgTyp algTyp = secOpts->integrityAlgTyp;
 
@@ -1941,18 +1954,27 @@ Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, U
                 return FALSE;
             }
             break;
-        case GMAC_AES256:
+        case GMAC_AES256: {
             INFO("REC doing GMAC\n");
             /* create local buffer to store calculated icv */
+            unsigned char localICV[secOpts->icvLength];
+            memset(localICV, 0, sizeof(localICV));
 
             /* call dm_GMAC passing in key, iv (at icvOffset in received buffer), ivlen,
              * data (start of ptp header), data len (up to ICV start)
-             * icv start (local buffer created to store this calculation) and icv len
+             * output (local buffer created to store this calculation) and icv len
              */
+            if (!dm_GMAC(secOpts->key, buf + icvOffset, IV_LEN, buf, icvOffset,
+                         localICV, secOpts->icvLength)) {
+                perror("error calculating GMAC in ICV verification");
+            }
 
             /* cmp locally calculated ICV with icv in rec buf, at icvOffset + 12 to account for IV */
-
+            if (memcmp(localICV, buf + icvOffset + IV_LEN, secOpts->icvLength)) {
+                return FALSE;
+            }
             break;
+        }
         default:
             INFO("error, unknown algTyp");
             return FALSE;

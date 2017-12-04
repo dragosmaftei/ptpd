@@ -9,7 +9,7 @@ void *dm_EVP_sha256();
 unsigned char *dm_HMAC(void *evp_md, const void *key,
                        int key_len, const unsigned char *d, int n,
                        unsigned char *md, unsigned int *md_len);
-int dm_GMAC(unsigned char *key,
+int dm_GMAC(const unsigned char *key,
             unsigned char *iv, int iv_len,
             unsigned char *data, int data_len,
             unsigned char *icv, int icv_len);

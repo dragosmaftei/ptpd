@@ -485,6 +485,7 @@ enum {
 /* length of sec TLV including only constant fields (not including optional fields or ICV) */
 #define SEC_TLV_CONSTANT_LEN 10
 #define MAX_SEC_KEY_LEN 32 /* 32 for HMAC, 16 for GMAC */
+#define IV_LEN 12 /* size of initialization vector to use for GMAC */
 
 /* security parameter indicator indicating presence of disclosed key (delayed processing only) */
 #define SPI_DISCLOSED_KEY 0x04

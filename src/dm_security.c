@@ -26,7 +26,7 @@ unsigned char *dm_HMAC(void *evp_md, const void *key,
  * this code is adopted from Jeffrey Walton https://pastebin.com/v3J93Cj4
  * return
  */
-int dm_GMAC(unsigned char *key,
+int dm_GMAC(const unsigned char *key,
             unsigned char *iv, int iv_len,
             unsigned char *data, int data_len,
             unsigned char *icv, int icv_len) {
