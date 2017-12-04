@@ -1824,6 +1824,8 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
 
 // CALCULATE AND PACK ICV need to pass in buffer, rtOpts->securityOpts, msg_len, secTLVLen
 
+
+
     calculateAndPackICV(&rtOpts->securityOpts, (unsigned char *)buf,
                         msg_len + secTLVLen - rtOpts->securityOpts.icvLength);
 
@@ -1875,7 +1877,7 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
     switch (algTyp) {
         case HMAC_SHA256:
             INFO("SEND doing HMAC\n");
-            /* calculate ICV from buffer, then pack it directly in the buffer */
+            /* the result of the ICV calculation will be stored here */
             unsigned char *static_digest;
 
             /*
@@ -1907,7 +1909,8 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
             if (fclose(fd))
                 perror("error closing");
 
-
+            if (DM_MSGS)
+                INFO("iv 1st byte:%01x\n", iv[0]);
 
             /* call dm_GMAC passing in key, iv, ivlen, data (start of ptp header),
              * data len (icvOffset minus IV len, don't want to include IV in the integrity calculation)
@@ -1919,6 +1922,9 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
             }
             /* pack IV in buffer before ICV so receiver will be able to use same IV to verify ICV */
             memcpy(buf + icvOffset - sizeof(iv), iv, sizeof(iv));
+
+            if (DM_MSGS)
+                INFO("ICV 1st byte:%01x\n", *(buf + icvOffset));
 
             break;
         default:

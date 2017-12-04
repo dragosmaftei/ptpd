@@ -3,11 +3,11 @@ OPERATE( tlvType, 2, Enumeration16)
 OPERATE( lengthField, 2, UInteger16)
 /* SPP (security parameter pointer) 1 octet */
 OPERATE( SPP, 1, UInteger8)
+/* secParamIndicator 1 octet */
+/* 0x04 flag indicates presence of disclosedKey in the message (for delayed only) */
+OPERATE ( secParamIndicator, 1, Octet)
 /* keyID 4 octets */
 OPERATE( keyID, 4, UInteger32)
-/* secParamIndicator 1 octet */
-/* either 0x00 for immediate, or 0x04 for delayed */
-OPERATE ( secParamIndicator, 1, Octet)
 
 /* optional fields and ICV are variable, they will be packed and unpacked manually
  *
