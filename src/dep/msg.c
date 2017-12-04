@@ -1786,7 +1786,7 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
 
     /* make TLV struct and populate it before packing the buffer */
     SecurityTLV sec_tlv;
-    memset(&sec_tlv, 0, sizeof(SecurityTLV));
+    memset(&sec_tlv, 0, SEC_TLV_CONSTANT_LEN);
     sec_tlv.tlvType = SECURITY;
     sec_tlv.lengthField = secTLVLen - 4; /* -4 to discount TYPE and LENGTH (2 bytes each) */
     sec_tlv.SPP = rtOpts->securityOpts.SPP;
@@ -1907,16 +1907,18 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
             if (fclose(fd))
                 perror("error closing");
 
-            /* call dm_GMAC passing in key, iv, ivlen, data (start of ptp header), data len (up to ICV start)
-             * icv start / where to place the calculated icv (+ 12 offset from icvOffset, to account for storing IV)
-             * and icv len
+
+
+            /* call dm_GMAC passing in key, iv, ivlen, data (start of ptp header),
+             * data len (icvOffset minus IV len, don't want to include IV in the integrity calculation)
+             * icv start / where to place the calculated icv, and icv len
              */
-            if (!dm_GMAC(secOpts->key, iv, sizeof(iv), buf, icvOffset,
-                         buf + icvOffset + sizeof(iv), secOpts->icvLength)) {
+            if (!dm_GMAC(secOpts->key, iv, sizeof(iv), buf, icvOffset - sizeof(iv),
+                         buf + icvOffset, secOpts->icvLength)) {
                 perror("error calculating GMAC");
             }
-            /* pack IV in buffer at icvOffset so receiver will be able to use same IV to verify ICV */
-            memcpy(buf + icvOffset, iv, sizeof(iv));
+            /* pack IV in buffer before ICV so receiver will be able to use same IV to verify ICV */
+            memcpy(buf + icvOffset - sizeof(iv), iv, sizeof(iv));
 
             break;
         default:
@@ -1960,17 +1962,18 @@ Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, U
             unsigned char localICV[secOpts->icvLength];
             memset(localICV, 0, sizeof(localICV));
 
-            /* call dm_GMAC passing in key, iv (at icvOffset in received buffer), ivlen,
-             * data (start of ptp header), data len (up to ICV start)
+            /* call dm_GMAC passing in key, iv from received msg, ivlen,
+             * data (start of ptp header), data len (not including ICV OR IV)
              * output (local buffer created to store this calculation) and icv len
              */
-            if (!dm_GMAC(secOpts->key, buf + icvOffset, IV_LEN, buf, icvOffset,
+            if (!dm_GMAC(secOpts->key, buf + icvOffset - IV_LEN, IV_LEN,
+                         buf, icvOffset - IV_LEN,
                          localICV, secOpts->icvLength)) {
                 perror("error calculating GMAC in ICV verification");
             }
 
-            /* cmp locally calculated ICV with icv in rec buf, at icvOffset + 12 to account for IV */
-            if (memcmp(localICV, buf + icvOffset + IV_LEN, secOpts->icvLength)) {
+            /* cmp locally calculated ICV with ICV in rec buf */
+            if (memcmp(localICV, buf + icvOffset, secOpts->icvLength)) {
                 return FALSE;
             }
             break;

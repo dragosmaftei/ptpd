@@ -1090,11 +1090,11 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
         } else if (memcmp(GMAC_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(GMAC_OID) - 1) == 0) {
             rtOpts->securityOpts.integrityAlgTyp = GMAC_AES256;
             /*
-             * for GMAC, the calculated MAC/tag/"ICV" is 16, but it must be sent along with the randomized IV (12)
-             * that it gets generated with... thus icvLength will include the IV length, i.e. IV(12) + tag(16) = 28
+             * for GMAC, the calculated MAC/tag/ICV is 16, but it must be sent along with the randomized IV (12)
+             * that it gets generated with... thus total secTLV len includes IV
              */
-            rtOpts->securityOpts.icvLength = 28;
-            rtOpts->securityOpts.secTLVLen = SEC_TLV_CONSTANT_LEN + 28;
+            rtOpts->securityOpts.icvLength = 16;
+            rtOpts->securityOpts.secTLVLen = SEC_TLV_CONSTANT_LEN + IV_LEN + 16;
         } else {
             // TODO make this print to correct error log
             printf("algorithm OID provided does not match, using HMAC as default\n");
