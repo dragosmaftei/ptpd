@@ -5,9 +5,10 @@
 structs & constants
 
 * src/ptp_datatypes.h
-    * structs: ICV, SecurityTLV (operate w/ secTLV.def)
+    * struct: SecurityTLV (operate w/ secTLV.def)
 * src/datatypes.h
     * security error counters
+	* IntegrityAlgTyp enum
     * SecurityOpts struct
         * RunTimeOpts holds SecurityOpts and 'securityEnabled' bool
     * SecurityTiming struct for measuring elapsed time processing security
@@ -15,22 +16,24 @@ structs & constants
 * src/constants.h
     * SECURITY=0x000D
     * other constants...
-        * SEC\_TLV\_IMM\_HMACSHA256\_LENGTH
-	    * MAX\_SECURITY\_KEY\_LENGTH
-	    * GDOI, TESLA
+        * SEC\_TLV\_CONSTANT\_LEN
+	    * MAX\_SEC\_KEY\_LEN
+		* IV\_LEN
+	    * SPI\_DISCLOSED\_KEY
+		* HMAC\_SHA256\_OID, GMAC\_OID, MAX\_OID\_LEN
 	    * MAX\_NUM\_TIMING\_MEASUREMENTS
 * src/ptpd.h
-    * define DM\_MSGS
+    * define DM\_MSGS, DEFINE\_SECURITY
     * include dm\_security.h 
 <p></p>
 functions
 
 * src/dep/ptpd_dep.h
-    * prototypes for addSecurityTLV and msgUnpackSecurityTLV
+    * prototypes functions in msg.c below
 * src/dep/msg.c
-    * packICV, unpackICV
     * msgPackSecurityTLV, msgUnpackSecurityTLV
     * **addSecurityTLV**
+	* calculateAndPackICV, calculateAndVerifyICV
 * src/protocol.c
     * recordTimingMeasurement
     * processMessage logic for receive side
@@ -46,23 +49,21 @@ options and measurements
 
 * src/Makefile.am
     * build with / without security
+* configure.ac
+	* configure time switch to enable security with preproc #DEFINEs
 * src/dep/configdefaults.c
-    * set default length field in rtOpts securityOpts
+    * set default alg type 
 * src/dep/daemonconfig.c
-    * tohex and keyStringToBinary
+    * tohex and stringToBinary
     * read security options from config file
-* src/dep/net.c
-    * debugs, trying to see what's defined
 * src/dep/sys.c
-    * include datatypes.h
     * added security errors to status file
 * src/display.c
     * dump security errors and timing measurements to log on SIGUSR2
 * gitignore
-    * /src/Makefile.am
+	* .idea
     * config files
     * CMakeLists.txt ??
-    * build scripts
     * cmake-build-debug??
     * src/.libs/??
 
@@ -72,6 +73,7 @@ options and measurements
 * src/def/securityTLV/securityTLV.def
 * src/dm_security.c
     * wrappers around HMAC and EVP\_sha256 to avoid define conflicts
+	* dm\_GMAC function to calculate ICV with GMAC
 * src/dm_security.h
     * prototypes...
 * test/pp_slave.conf
