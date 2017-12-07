@@ -3319,10 +3319,6 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
      * which would be used to query the SAD to get the relevant SA, which contains necessary security parameters
      */
     if (rtOpts->securityEnabled) {
-        if (DM_MSGS)
-            INFO("DM: calculateandpack on seqid %04x\n",
-                 ptpClock->msgTmpHeader.sequenceId);
-
         /* add security TLV, returns size, add it to length of the packet to send */
         packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
     }
