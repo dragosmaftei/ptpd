@@ -9,7 +9,7 @@
  *                         Inaqui Delgado,
  *                         Rick Ratzel,
  *                         National Instruments.
- * Copyright     (c) 2009-2010 George V. Neville-Neil,
+ * Copyright (c) 2009-2010 George V. Neville-Neil,
  *                         Steven Kreuzer,
  *                         Martin Burnicki,
  *                         Jan Breuer,
@@ -1347,6 +1347,7 @@ recordTimingMeasurement(PtpClock *ptpClock, Enumeration4Lower type, Boolean recv
 void
 processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp, ssize_t length)
 {
+
     Boolean isFromSelf;
 
     /*
@@ -1536,8 +1537,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			}
 
 
-// CALCULATE AND VERIFY ICV
-
+            /* calculate and verify ICV, returns false if verification fails */
 			if (calculateAndVerifyICV(&rtOpts->securityOpts, (unsigned char *)ptpClock->msgIbuf,
 								  packetLength + secTLVLen - rtOpts->securityOpts.icvLength) == FALSE) {
 				ptpClock->counters.securityErrors++;
@@ -1546,35 +1546,6 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 					INFO("DM: icv's DIDNT MATCH on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
 				return;
 			}
-
-//			unsigned char *static_digest;
-//
-//			/*
-//			 * want from header all the way up to ICV, so:
-//			 * packetlength + total TLV length (variable but already calculated) - ICV length (variable)
-//			 * calculating it this way accounts for different alg types, as well as for the disclosed key, if present,
-//			 * if doing delayed processing
-//			 */
-//			static_digest = dm_HMAC(dm_EVP_sha256(), rtOpts->securityOpts.key, rtOpts->securityOpts.keyLen,
-//									(unsigned char *) ptpClock->msgIbuf,
-//									packetLength + secTLVLen - rtOpts->securityOpts.icvLength,
-//									NULL, NULL);
-//
-//			/*
-//             * ICV gets truncated to 128 bits, so compare only 16 bytes
-//             * msgIbuf + packetLength is the start of the secTLV, + total TLV len - ICV len = start of ICV
-//             */
-//			if (memcmp(static_digest,
-//					   ptpClock->msgIbuf + packetLength + secTLVLen - rtOpts->securityOpts.icvLength,
-//					   rtOpts->securityOpts.icvLength)) {
-//				ptpClock->counters.securityErrors++;
-//				ptpClock->counters.icvMismatchErrors++;
-//				if (DM_MSGS)
-//					INFO("DM: icv's DIDNT MATCH on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
-//				return;
-//			}
-
-
 
 			/*
              * for delayed, restore correctionField to its previous value before it was zeroed out (might not even be
@@ -1585,9 +1556,6 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				memcpy((ptpClock->msgIbuf + 8), &correctionFieldTmp.msb, 4);
 				memcpy((ptpClock->msgIbuf + 12), &correctionFieldTmp.lsb, 4);
 			}
-
-
-
 		}
         /*
          * our emulated SPD query indicated that this message should be processed for security, but the message is
@@ -3479,35 +3447,36 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 		DBGV("Sync MSG sent ! \n");
 
 #ifdef SO_TIMESTAMPING
+
 #ifdef PTPD_PCAP
 		if((ptpClock->netPath.pcapEvent == NULL) && !ptpClock->netPath.txTimestampFailure) {
 #else
-		if (!ptpClock->netPath.txTimestampFailure) {
+		if(!ptpClock->netPath.txTimestampFailure) {
 #endif /* PTPD_PCAP */
-			if (internalTime.seconds && internalTime.nanoseconds) {
+			if(internalTime.seconds && internalTime.nanoseconds) {
 
-				if (respectUtcOffset(rtOpts, ptpClock) == TRUE) {
-					internalTime.seconds += ptpClock->timePropertiesDS.currentUtcOffset;
-				}
-				processSyncFromSelf(&internalTime, rtOpts, ptpClock, dst, *sequenceId);
+			    if (respectUtcOffset(rtOpts, ptpClock) == TRUE) {
+				    internalTime.seconds += ptpClock->timePropertiesDS.currentUtcOffset;
+			    }
+			    processSyncFromSelf(&internalTime, rtOpts, ptpClock, dst, *sequenceId);
 			}
 		}
 #endif
 
 #if defined(__QNXNTO__) && defined(PTPD_EXPERIMENTAL)
-        if(internalTime.seconds && internalTime.nanoseconds) {
-            if (respectUtcOffset(rtOpts, ptpClock) == TRUE) {
-                internalTime.seconds += ptpClock->timePropertiesDS.currentUtcOffset;
-            }
-                processSyncFromSelf(&internalTime, rtOpts, ptpClock, dst, *sequenceId);
-        }
+	if(internalTime.seconds && internalTime.nanoseconds) {
+	    if (respectUtcOffset(rtOpts, ptpClock) == TRUE) {
+		    internalTime.seconds += ptpClock->timePropertiesDS.currentUtcOffset;
+	    }
+		    processSyncFromSelf(&internalTime, rtOpts, ptpClock, dst, *sequenceId);
+	}
 #endif
 
 
 		ptpClock->lastSyncDst = dst;
 
-		if (!internalTime.seconds && !internalTime.nanoseconds) {
-			internalTime = now;
+		if(!internalTime.seconds && !internalTime.nanoseconds) {
+		    internalTime = now;
 		}
 
 		/* index the Sync destination */

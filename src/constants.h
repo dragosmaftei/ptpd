@@ -286,9 +286,6 @@ enum {
 	GENERAL_ERROR=0xFFFE
 };
 
-#if DEFINE_SECURITY
-#define PTPD_SECURITY
-#endif /* DEFINE_SECURITY */
 /*
  * \brief PTP tlvType values (Table 34 in the spec)
  */

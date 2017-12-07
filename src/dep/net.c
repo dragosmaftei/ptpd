@@ -767,6 +767,7 @@ failure:
 static Boolean
 netInitTimestamping(NetPath * netPath, const RunTimeOpts * rtOpts)
 {
+
 	int val = 1;
 	Boolean result = TRUE;
 #if defined(SO_TIMESTAMPING) && defined(SO_TIMESTAMPNS)/* Linux - current API */
@@ -1172,7 +1173,6 @@ netInit(NetPath * netPath, RunTimeOpts * rtOpts, PtpClock * ptpClock)
 #endif /* SO_TIMESTAMPING */
 	} else {
 #endif
-
 		/* save interface address for IGMP refresh */
 		{
 		    struct sockaddr_in* sin = (struct sockaddr_in*)&(netPath->interfaceInfo.afAddress);

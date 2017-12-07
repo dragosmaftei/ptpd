@@ -1059,133 +1059,133 @@ handleSignaling(MsgHeader *header,
 	/* loop over all supported TLVs as if they came in separate messages */
 	while(msgUnpackSignaling(ptpClock->msgIbuf,&ptpClock->msgTmp.signaling, header, ptpClock, tlvOffset)) {
 
-        if(ptpClock->msgTmp.signaling.tlv == NULL) {
+	if(ptpClock->msgTmp.signaling.tlv == NULL) {
 
-            if (tlvFound == 0) {
-                DBGV("handleSignaling: No TLVs in message\n");
-                ptpClock->counters.messageFormatErrors++;
-            } else {
-                DBGV("handleSignaling: No more TLVs\n");
-            }
-            return;
-        }
+	    	if(tlvFound==0) {
+		    DBGV("handleSignaling: No TLVs in message\n");
+		    ptpClock->counters.messageFormatErrors++;
+		} else {
+		    DBGV("handleSignaling: No more TLVs\n");
+		}
+		return;
+	}
 
-        tlvFound++;
+	tlvFound++;
 
-        /* accept the message if directed either to us or to all-ones */
+	/* accept the message if directed either to us or to all-ones */
         if(!acceptPortIdentity(ptpClock->portDS.portIdentity, ptpClock->msgTmp.signaling.targetPortIdentity))
         {
                 DBG("handleSignaling: The signaling message was not accepted");
-        ptpClock->counters.discardedMessages++;
+		ptpClock->counters.discardedMessages++;
                 goto end;
         }
 
-        /* Can we handle this? */
+	/* Can we handle this? */
 
-        switch(ptpClock->msgTmp.signaling.tlv->tlvType)
-        {
-        case TLV_REQUEST_UNICAST_TRANSMISSION:
-            DBGV("handleSignaling: Request Unicast Transmission\n");
-            if(!rtOpts->unicastNegotiation || rtOpts->ipMode!=IPMODE_UNICAST) {
-                DBGV("handleSignaling: Ignoring unicast negotiation message - not running unicast or negotiation not enabled\n");
-                ptpClock->counters.discardedMessages++;
-                goto end;
-            }
-            if( (ptpClock->portDS.portState==PTP_LISTENING && !rtOpts->unicastNegotiationListening) ||
-                ptpClock->portDS.portState==PTP_DISABLED || ptpClock->portDS.portState == PTP_INITIALIZING ||
-                ptpClock->portDS.portState==PTP_FAULTY) {
-                        DBG("Will not grant unicast transmission requests in %s state\n",
-                                portState_getName(ptpClock->portDS.portState));
-                    ptpClock->counters.discardedMessages++;
-                        goto end;
-            }
-            unpackSMRequestUnicastTransmission(ptpClock->msgIbuf + tlvOffset, &ptpClock->msgTmp.signaling, ptpClock);
-            handleSMRequestUnicastTransmission(&ptpClock->msgTmp.signaling, &ptpClock->outgoingSignalingTmp, sourceAddress, rtOpts, ptpClock);
-            /* send back the outgoing signaling message */
-            if(ptpClock->outgoingSignalingTmp.tlv->tlvType == TLV_GRANT_UNICAST_TRANSMISSION) {
-                issueSignaling(&ptpClock->outgoingSignalingTmp, sourceAddress,rtOpts, ptpClock);
-            }
-            break;
-        case TLV_CANCEL_UNICAST_TRANSMISSION:
-            DBGV("handleSignaling: Cancel Unicast Transmission\n");
-            if(!rtOpts->unicastNegotiation || rtOpts->ipMode!=IPMODE_UNICAST) {
-                DBGV("handleSignaling: Ignoring unicast negotiation message - not running unicast or negotiation not enabled\n");
-                ptpClock->counters.discardedMessages++;
-                goto end;
-            }
-            if( (ptpClock->portDS.portState==PTP_LISTENING && !rtOpts->unicastNegotiationListening) ||
-                ptpClock->portDS.portState==PTP_DISABLED || ptpClock->portDS.portState == PTP_INITIALIZING ||
-                ptpClock->portDS.portState==PTP_FAULTY) {
-                        DBG("Will not cancel unicast transmission requests in %s state\n",
-                                portState_getName(ptpClock->portDS.portState));
-                    ptpClock->counters.discardedMessages++;
-                        goto end;
-            }
-            unpackSMCancelUnicastTransmission(ptpClock->msgIbuf + tlvOffset, &ptpClock->msgTmp.signaling, ptpClock);
-            /* send back the cancel acknowledgment - if we have something to acknowledge*/
-            if(handleSMCancelUnicastTransmission(&ptpClock->msgTmp.signaling, &ptpClock->outgoingSignalingTmp, sourceAddress, ptpClock)) {
-                issueSignaling(&ptpClock->outgoingSignalingTmp, sourceAddress,rtOpts, ptpClock);
-                ptpClock->counters.unicastGrantsCancelAckSent++;
-            }
-            break;
-        case TLV_ACKNOWLEDGE_CANCEL_UNICAST_TRANSMISSION:
-            DBGV("handleSignaling: Acknowledge Cancel Unicast Transmission\n");
-            if(!rtOpts->unicastNegotiation || rtOpts->ipMode!=IPMODE_UNICAST) {
-                DBGV("handleSignaling: Ignoring unicast negotiation message - not running unicast or negotiation not enabled\n");
-                ptpClock->counters.discardedMessages++;
-                goto end;
-            }
-            if( (ptpClock->portDS.portState==PTP_LISTENING && !rtOpts->unicastNegotiationListening) ||
-                ptpClock->portDS.portState==PTP_DISABLED || ptpClock->portDS.portState == PTP_INITIALIZING ||
-                ptpClock->portDS.portState==PTP_FAULTY) {
-                        DBG("Will not process acknowledge cancel unicast transmission in %s state\n",
-                                portState_getName(ptpClock->portDS.portState));
-                    ptpClock->counters.discardedMessages++;
-                        goto end;
-            }
-            unpackSMAcknowledgeCancelUnicastTransmission(ptpClock->msgIbuf + tlvOffset, &ptpClock->msgTmp.signaling, ptpClock);
-            handleSMAcknowledgeCancelUnicastTransmission(&ptpClock->msgTmp.signaling, sourceAddress, ptpClock);
-            break;
-        case TLV_GRANT_UNICAST_TRANSMISSION:
-            DBGV("handleSignaling: Grant Unicast Transmission\n");
-            if(!rtOpts->unicastNegotiation || rtOpts->ipMode!=IPMODE_UNICAST) {
-                DBGV("handleSignaling: Ignoring unicast negotiation message - not running unicast or negotiation not enabled\n");
-                ptpClock->counters.discardedMessages++;
-                goto end;
-            }
-            if(
-                ptpClock->portDS.portState==PTP_DISABLED || ptpClock->portDS.portState == PTP_INITIALIZING ||
-                ptpClock->portDS.portState==PTP_FAULTY) {
-                        DBG("Will not process acknowledge cancel unicast transmission in %s state\n",
-                                portState_getName(ptpClock->portDS.portState));
-                    ptpClock->counters.discardedMessages++;
-                        goto end;
-            }
-            unpackSMGrantUnicastTransmission(ptpClock->msgIbuf + tlvOffset, &ptpClock->msgTmp.signaling, ptpClock);
-            handleSMGrantUnicastTransmission(&ptpClock->msgTmp.signaling, sourceAddress, ptpClock->unicastGrants, ptpClock->unicastDestinationCount, ptpClock);
-            if(ptpClock->portDS.delayMechanism == P2P) {
-                handleSMGrantUnicastTransmission(&ptpClock->msgTmp.signaling, sourceAddress, &ptpClock->peerGrants, 1, ptpClock);
-            }
-            break;
+	switch(ptpClock->msgTmp.signaling.tlv->tlvType)
+	{
+	case TLV_REQUEST_UNICAST_TRANSMISSION:
+		DBGV("handleSignaling: Request Unicast Transmission\n");
+		if(!rtOpts->unicastNegotiation || rtOpts->ipMode!=IPMODE_UNICAST) {
+			DBGV("handleSignaling: Ignoring unicast negotiation message - not running unicast or negotiation not enabled\n");
+			ptpClock->counters.discardedMessages++;
+			goto end;
+		}
+		if( (ptpClock->portDS.portState==PTP_LISTENING && !rtOpts->unicastNegotiationListening) ||
+		    ptpClock->portDS.portState==PTP_DISABLED || ptpClock->portDS.portState == PTP_INITIALIZING ||
+		    ptpClock->portDS.portState==PTP_FAULTY) {
+	        	    DBG("Will not grant unicast transmission requests in %s state\n",
+                			portState_getName(ptpClock->portDS.portState));
+			    ptpClock->counters.discardedMessages++;
+        		    goto end;
+		}
+		unpackSMRequestUnicastTransmission(ptpClock->msgIbuf + tlvOffset, &ptpClock->msgTmp.signaling, ptpClock);
+		handleSMRequestUnicastTransmission(&ptpClock->msgTmp.signaling, &ptpClock->outgoingSignalingTmp, sourceAddress, rtOpts, ptpClock);
+		/* send back the outgoing signaling message */
+		if(ptpClock->outgoingSignalingTmp.tlv->tlvType == TLV_GRANT_UNICAST_TRANSMISSION) {
+			issueSignaling(&ptpClock->outgoingSignalingTmp, sourceAddress,rtOpts, ptpClock);
+		}
+		break;
+	case TLV_CANCEL_UNICAST_TRANSMISSION:
+		DBGV("handleSignaling: Cancel Unicast Transmission\n");
+		if(!rtOpts->unicastNegotiation || rtOpts->ipMode!=IPMODE_UNICAST) {
+			DBGV("handleSignaling: Ignoring unicast negotiation message - not running unicast or negotiation not enabled\n");
+			ptpClock->counters.discardedMessages++;
+			goto end;
+		}
+		if( (ptpClock->portDS.portState==PTP_LISTENING && !rtOpts->unicastNegotiationListening) ||
+		    ptpClock->portDS.portState==PTP_DISABLED || ptpClock->portDS.portState == PTP_INITIALIZING ||
+		    ptpClock->portDS.portState==PTP_FAULTY) {
+	        	    DBG("Will not cancel unicast transmission requests in %s state\n",
+                			portState_getName(ptpClock->portDS.portState));
+			    ptpClock->counters.discardedMessages++;
+        		    goto end;
+		}
+		unpackSMCancelUnicastTransmission(ptpClock->msgIbuf + tlvOffset, &ptpClock->msgTmp.signaling, ptpClock);
+		/* send back the cancel acknowledgment - if we have something to acknowledge*/
+		if(handleSMCancelUnicastTransmission(&ptpClock->msgTmp.signaling, &ptpClock->outgoingSignalingTmp, sourceAddress, ptpClock)) {
+			issueSignaling(&ptpClock->outgoingSignalingTmp, sourceAddress,rtOpts, ptpClock);
+			ptpClock->counters.unicastGrantsCancelAckSent++;
+		}
+		break;
+	case TLV_ACKNOWLEDGE_CANCEL_UNICAST_TRANSMISSION:
+		DBGV("handleSignaling: Acknowledge Cancel Unicast Transmission\n");
+		if(!rtOpts->unicastNegotiation || rtOpts->ipMode!=IPMODE_UNICAST) {
+			DBGV("handleSignaling: Ignoring unicast negotiation message - not running unicast or negotiation not enabled\n");
+			ptpClock->counters.discardedMessages++;
+			goto end;
+		}
+		if( (ptpClock->portDS.portState==PTP_LISTENING && !rtOpts->unicastNegotiationListening) ||
+		    ptpClock->portDS.portState==PTP_DISABLED || ptpClock->portDS.portState == PTP_INITIALIZING ||
+		    ptpClock->portDS.portState==PTP_FAULTY) {
+	        	    DBG("Will not process acknowledge cancel unicast transmission in %s state\n",
+                			portState_getName(ptpClock->portDS.portState));
+			    ptpClock->counters.discardedMessages++;
+        		    goto end;
+		}
+		unpackSMAcknowledgeCancelUnicastTransmission(ptpClock->msgIbuf + tlvOffset, &ptpClock->msgTmp.signaling, ptpClock);
+		handleSMAcknowledgeCancelUnicastTransmission(&ptpClock->msgTmp.signaling, sourceAddress, ptpClock);
+		break;
+	case TLV_GRANT_UNICAST_TRANSMISSION:
+		DBGV("handleSignaling: Grant Unicast Transmission\n");
+		if(!rtOpts->unicastNegotiation || rtOpts->ipMode!=IPMODE_UNICAST) {
+			DBGV("handleSignaling: Ignoring unicast negotiation message - not running unicast or negotiation not enabled\n");
+			ptpClock->counters.discardedMessages++;
+			goto end;
+		}
+		if(
+		    ptpClock->portDS.portState==PTP_DISABLED || ptpClock->portDS.portState == PTP_INITIALIZING ||
+		    ptpClock->portDS.portState==PTP_FAULTY) {
+	        	    DBG("Will not process acknowledge cancel unicast transmission in %s state\n",
+                			portState_getName(ptpClock->portDS.portState));
+			    ptpClock->counters.discardedMessages++;
+        		    goto end;
+		}
+		unpackSMGrantUnicastTransmission(ptpClock->msgIbuf + tlvOffset, &ptpClock->msgTmp.signaling, ptpClock);
+		handleSMGrantUnicastTransmission(&ptpClock->msgTmp.signaling, sourceAddress, ptpClock->unicastGrants, ptpClock->unicastDestinationCount, ptpClock);
+		if(ptpClock->portDS.delayMechanism == P2P) {
+		    handleSMGrantUnicastTransmission(&ptpClock->msgTmp.signaling, sourceAddress, &ptpClock->peerGrants, 1, ptpClock);
+		}
+		break;
 
-        default:
+	default:
 
-            DBGV("handleSignaling: received unsupported TLV type %04x\n",
-            ptpClock->msgTmp.signaling.tlv->tlvType );
-            ptpClock->counters.discardedMessages++;
-            goto end;
-        }
-
-        end:
-        /* Movin' on up! */
-        tlvOffset += TL_LENGTH + ptpClock->msgTmp.signaling.tlv->lengthField;
-        /* cleanup msgTmp signalingTLV */
-        freeSignalingTLV(&ptpClock->msgTmp.signaling);
-        /* cleanup outgoing signalingTLV */
-        freeSignalingTLV(&ptpClock->outgoingSignalingTmp);
+		DBGV("handleSignaling: received unsupported TLV type %04x\n",
+		ptpClock->msgTmp.signaling.tlv->tlvType );
+		ptpClock->counters.discardedMessages++;
+		goto end;
 	}
 
-	if(!tlvFound) {
+	end:
+	/* Movin' on up! */
+	tlvOffset += TL_LENGTH + ptpClock->msgTmp.signaling.tlv->lengthField;
+	/* cleanup msgTmp signalingTLV */
+	freeSignalingTLV(&ptpClock->msgTmp.signaling);
+	/* cleanup outgoing signalingTLV */
+	freeSignalingTLV(&ptpClock->outgoingSignalingTmp);
+	}
+
+    	if(!tlvFound) {
 	    DBGV("handleSignaling: No TLVs in message\n");
 	    ptpClock->counters.messageFormatErrors++;
 	} else {

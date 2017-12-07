@@ -126,7 +126,7 @@ main(int argc, char **argv)
 	/* global variable for message(), please see comment on top of this file */
 	G_ptpClock = ptpClock;
 
-    /* do the protocol engine */
+	/* do the protocol engine */
 	protocol(&rtOpts, ptpClock);
 	/* forever loop.. */
 

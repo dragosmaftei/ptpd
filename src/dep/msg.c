@@ -1645,16 +1645,6 @@ packMsgSignaling(MsgSignaling *m, Octet *buf)
 	#define OPERATE( name, size, type) \
 		pack##type (&data->name, buf + offset); \
 		offset = offset + size;
-/*
-    OPERATE( header, 34, MsgHeader)
-    OPERATE( targetPortIdentity, 10, PortIdentity)
-
-    packMsgHeader(&data->header, buf + offset);
-    offset = offset + 34;
-
-    packPortIdentity(&data->targetPortIdentity, buf + offset);
-    offset = offset + 10;
- */
 	#include "../def/message/signaling.def"
 
 }
@@ -2004,7 +1994,6 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
 	/* Two step flag - table 20: Sync and PdelayResp only */
 	if (ptpClock->defaultDS.twoStepFlag)
 		*(UInteger8 *) (buf + 6) |= PTP_TWO_STEP;
-
     /* Table 19 */
     *(UInteger16 *) (buf + 2) = flip16(SYNC_LENGTH);
 	*(UInteger16 *) (buf + 30) = flip16(sequenceId);
@@ -2019,7 +2008,6 @@ msgPackSync(Octet * buf, UInteger16 sequenceId, Timestamp * originTimestamp, Ptp
 	*(UInteger16 *) (buf + 34) = flip16(originTimestamp->secondsField.msb);
 	*(UInteger32 *) (buf + 36) = flip32(originTimestamp->secondsField.lsb);
 	*(UInteger32 *) (buf + 40) = flip32(originTimestamp->nanosecondsField);
-
 }
 #endif /* PTPD_SLAVE_ONLY */
 
@@ -2554,7 +2542,8 @@ msgPackManagementTLV(Octet *buf, MsgManagement *outgoing, PtpClock *ptpClock)
         case MM_LOG_SYNC_INTERVAL:
                 dataLength = packMMLogSyncInterval(outgoing, buf);
                 #ifdef PTPD_DBG
-                mMLogSyncInterval_display((MMLogSyncInterval*)outgoing->tlv->dataField, ptpClock);
+                mMLogSyncInterval_display(
+                                (MMLogSyncInterval*)outgoing->tlv->dataField, ptpClock);
                 #endif /* PTPD_DBG */
                 break;
         case MM_VERSION_NUMBER:

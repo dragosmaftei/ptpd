@@ -16,7 +16,7 @@
  */
 
 #define DM_MSGS 1
-#define DEFINE_SECURITY 0
+#define DEFINE_SECURITY 1
 
 #if DEFINE_SECURITY
 #define PTPD_SECURITY
@@ -187,8 +187,6 @@
 #include "dep/daemonconfig.h"
 
 #include "dep/alarms.h"
-
-
 
 
 
