@@ -841,7 +841,7 @@ stringToBinary(char *valueString, unsigned char *value, int maxLen)
         printf("i: %d, first: 0x%01x, second: 0x%01x\n", i, first, second);
 
         if ((first == -1) || (second == -1)) {
-            // TODO make this print to correct error log
+            // DM: TODO make this print to correct error log
             printf("invalid hex character in specified input string; value will be zeroed out\n");
             memset(value, 0, maxLen);
             return;
@@ -1096,7 +1096,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
             rtOpts->securityOpts.icvLength = 16;
             rtOpts->securityOpts.secTLVLen = SEC_TLV_CONSTANT_LEN + IV_LEN + 16;
         } else {
-            // TODO make this print to correct error log
+            // DM: TODO make this print to correct error log
             printf("algorithm OID provided does not match, using HMAC as default\n");
         }
 

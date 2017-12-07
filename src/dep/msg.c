@@ -1895,7 +1895,7 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
             break;
         case GMAC_AES256:
             INFO("SEND doing GMAC\n");
-            // TODO ERROR MESSAGES INSTEAD OF PERROR
+            // DM: TODO ERROR MESSAGES INSTEAD OF PERROR
             /* get random bytes for IV */
             unsigned char iv[IV_LEN];
             memset(iv, 0, sizeof(iv));
