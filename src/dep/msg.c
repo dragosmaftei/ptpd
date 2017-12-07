@@ -1909,9 +1909,6 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
             if (fclose(fd))
                 perror("error closing");
 
-            if (DM_MSGS)
-                INFO("iv 1st byte:%01x\n", iv[0]);
-
             /* call dm_GMAC passing in key, iv, ivlen, data (start of ptp header),
              * data len (icvOffset minus IV len, don't want to include IV in the integrity calculation)
              * icv start / where to place the calculated icv, and icv len
@@ -1924,7 +1921,7 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
             memcpy(buf + icvOffset - sizeof(iv), iv, sizeof(iv));
 
             if (DM_MSGS)
-                INFO("ICV 1st byte:%01x\n", *(buf + icvOffset));
+                INFO("IV[0]: %01x, ICV[0]:%01x\n", iv[0], *(buf + icvOffset));
 
             break;
         default:
