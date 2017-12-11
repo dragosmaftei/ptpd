@@ -838,11 +838,10 @@ stringToBinary(char *valueString, unsigned char *value, int maxLen)
         char first, second;
         first = tohex(valueString[i * 2]);
         second = tohex(valueString[i * 2 + 1]);
-        printf("i: %d, first: 0x%01x, second: 0x%01x\n", i, first, second);
+        if (DM_MSGS) printf("i: %d, first: 0x%01x, second: 0x%01x\n", i, first, second);
 
         if ((first == -1) || (second == -1)) {
-            // DM: TODO make this print to correct error log
-            printf("invalid hex character in specified input string; value will be zeroed out\n");
+            WARNING("Invalid hex character in specified input string %s; value will be zeroed out\n", valueString);
             memset(value, 0, maxLen);
             return;
         }
@@ -1064,52 +1063,56 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 									"If using immediate security processing, ignore correction field in ICV calculation.");
 
 
-    printf("the keystring size is (should always be this): %lu\n", sizeof(rtOpts->securityOpts.keyString));
-    printf("the keystring STRLEN is: %lu\n", strlen(rtOpts->securityOpts.keyString));
-    printf("the keyString is:\n\t");
-    for (int i = 0; i < (sizeof(rtOpts->securityOpts.keyString)); i++)
-        printf("0x%02x ", rtOpts->securityOpts.keyString[i]);
-	printf("\n");
+	if (DM_MSGS) {
+		printf("the keystring size is (should always be this): %lu\n", sizeof(rtOpts->securityOpts.keyString));
+		printf("the keystring STRLEN is: %lu\n", strlen(rtOpts->securityOpts.keyString));
+		printf("the keyString is:\n\t");
+		for (int i = 0; i < (sizeof(rtOpts->securityOpts.keyString)); i++)
+			printf("0x%02x ", rtOpts->securityOpts.keyString[i]);
+		printf("\n");
+	}
 
     if (rtOpts->securityEnabled) {
         stringToBinary(rtOpts->securityOpts.keyString, rtOpts->securityOpts.key, MAX_SEC_KEY_LEN);
 		stringToBinary(rtOpts->securityOpts.integrityAlgTypOIDString, rtOpts->securityOpts.integrityAlgTypOID, MAX_OID_LEN);
 
-		printf("the OID is: \n\t");
-		for (int i = 0; i < 20; i++)
-			printf("0x%02x ", rtOpts->securityOpts.integrityAlgTypOID[i]);
-		printf("\n");
+		if (DM_MSGS) {
+			printf("the OID is: \n\t");
+			for (int i = 0; i < 20; i++)
+				printf("0x%02x ", rtOpts->securityOpts.integrityAlgTypOID[i]);
+			printf("\n");
 
-		printf("the OID size is: %d\n", rtOpts->securityOpts.integrityAlgTypOID[1] + 2);
+			printf("the OID size is: %d\n", rtOpts->securityOpts.integrityAlgTypOID[1] + 2);
+		}
 
 		/* set integrityAlgTyp enum accordingly */
 		if (memcmp(HMAC_SHA256_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(HMAC_SHA256_OID) - 1) == 0) {
 		    rtOpts->securityOpts.integrityAlgTyp = HMAC_SHA256;
-            rtOpts->securityOpts.icvLength = 16;
-            rtOpts->securityOpts.secTLVLen = SEC_TLV_CONSTANT_LEN + 16;
+            rtOpts->securityOpts.icvLength = HMAC_SHA256_ICV_LEN;
+            rtOpts->securityOpts.secTLVLen = SEC_TLV_CONSTANT_LEN + HMAC_SHA256_ICV_LEN;
         } else if (memcmp(GMAC_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(GMAC_OID) - 1) == 0) {
             rtOpts->securityOpts.integrityAlgTyp = GMAC_AES256;
             /*
              * for GMAC, the calculated MAC/tag/ICV is 16, but it must be sent along with the randomized IV (12)
              * that it gets generated with... thus total secTLV len includes IV
              */
-            rtOpts->securityOpts.icvLength = 16;
-            rtOpts->securityOpts.secTLVLen = SEC_TLV_CONSTANT_LEN + IV_LEN + 16;
+            rtOpts->securityOpts.icvLength = GMAC_ICV_LEN;
+            rtOpts->securityOpts.secTLVLen = SEC_TLV_CONSTANT_LEN + GMAC_IV_LEN + GMAC_ICV_LEN;
         } else {
-            // DM: TODO make this print to correct error log
-            printf("algorithm OID provided does not match, using HMAC as default\n");
+            WARNING("The algorithm OID provided does not match; using HMAC as default\n");
         }
 
 
-        switch (rtOpts->securityOpts.integrityAlgTyp) {
-            case GMAC_AES256:
-                printf("it's GMAC\n");
-                break;
-            case HMAC_SHA256:
-                printf("it's HMAC\n");
-                break;
-        }
-
+		if (DM_MSGS) {
+			switch (rtOpts->securityOpts.integrityAlgTyp) {
+				case GMAC_AES256:
+					printf("it's GMAC\n");
+					break;
+				case HMAC_SHA256:
+					printf("it's HMAC\n");
+					break;
+			}
+		}
 
 
 		rtOpts->securityOpts.SPP =  (UInteger8) strtoul(rtOpts->securityOpts.SPPString, 0, 16); // base 16
@@ -1119,12 +1122,14 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
         rtOpts->securityOpts.keyLen = strlen(rtOpts->securityOpts.keyString) / 2;
     }
 
-    printf("the key is (length: %d):\n\t", rtOpts->securityOpts.keyLen);
-    for (int i = 0; i < 32; i++) {
-        printf("0x%02x ", rtOpts->securityOpts.key[i]);
-    }
-    printf("\nSPP: %02x\nkeyid: %08x\n",
-           rtOpts->securityOpts.SPP, rtOpts->securityOpts.keyID);
+	if (DM_MSGS) {
+		printf("the key is (length: %d):\n\t", rtOpts->securityOpts.keyLen);
+		for (int i = 0; i < 32; i++) {
+			printf("0x%02x ", rtOpts->securityOpts.key[i]);
+		}
+		printf("\nSPP: %02x\nkeyid: %08x\n",
+			   rtOpts->securityOpts.SPP, rtOpts->securityOpts.keyID);
+	}
 
 #endif /* PTPD_SECURITY */
 

@@ -1744,6 +1744,12 @@ void msgPackSecurityTLV(SecurityTLV *data, Octet *buf)
 UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
 {
     /*
+     * ugly workaround (in the absence of an actual SPD lookup) to make slave using delayed proc. NOT add TLV
+     * in an actual solution, a slave's SPD lookup based on policy limiting fields would return 0, or the SPP
+     * for an SA for immediate processing
+     */
+
+    /*
      * we've "used policy limiting fields to query the SPD" (i.e. in this emulation, just checked 'securityEnabled'),
      * and the query "returned an SPP to query SAD to obtain the relevant SA which contains other security paramaters",
      * (i.e. in this emulation, the parameters were read in from config file)... these parameters include:
@@ -1812,36 +1818,9 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
         memset(buf + 8, 0, 8); // zero out the correction field
     }
 
-// CALCULATE AND PACK ICV need to pass in buffer, rtOpts->securityOpts, msg_len, secTLVLen
-
-
-
+    /* passing in security parameters, buffer (start of PTP header), and the ICV offset */
     calculateAndPackICV(&rtOpts->securityOpts, (unsigned char *)buf,
                         msg_len + secTLVLen - rtOpts->securityOpts.icvLength);
-
-
-
-//
-//    /* calculate ICV from buffer, then pack it directly in the buffer */
-//    unsigned char *static_digest;
-//
-//    /*
-//	 * want from header all the way up to ICV, so:
-//	 * msg_len + total TLV length (variable but already calculated) - ICV length (variable)
-//	 * calculating it this way accounts for different alg types, as well as for the disclosed key, if present,
-//	 * if doing delayed processing
-//	 */
-//    static_digest = dm_HMAC(dm_EVP_sha256(), rtOpts->securityOpts.key, rtOpts->securityOpts.keyLen,
-//                            (unsigned char *) buf,
-//                            msg_len + secTLVLen - rtOpts->securityOpts.icvLength,
-//                            NULL, NULL);
-//
-//    /* truncate the digest to 128 bits and pack it by copying just 16 bytes directly into the buffer */
-//    memcpy(buf + msg_len + secTLVLen - rtOpts->securityOpts.icvLength,
-//           static_digest, rtOpts->securityOpts.icvLength);
-//
-
-
 
     /*
      * for delayed (or if imm but ignoring correction field),
@@ -1866,7 +1845,7 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
 
     switch (algTyp) {
         case HMAC_SHA256:
-            INFO("SEND doing HMAC\n");
+            if (DM_MSGS) INFO("SEND doing HMAC\n");
             /* the result of the ICV calculation will be stored here */
             unsigned char *static_digest;
 
@@ -1884,20 +1863,19 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
 
             break;
         case GMAC_AES256:
-            INFO("SEND doing GMAC\n");
-            // DM: TODO ERROR MESSAGES INSTEAD OF PERROR
+            if (DM_MSGS) INFO("SEND doing GMAC\n");
             /* get random bytes for IV */
-            unsigned char iv[IV_LEN];
+            unsigned char iv[GMAC_IV_LEN];
             memset(iv, 0, sizeof(iv));
             FILE *fd;
             if (!(fd = fopen("/dev/urandom", "r")))
-                perror("error opening");
+                ERROR("fopen() failed!\n");
             /* read random bytes from /dev/urandom */
             int bytes_read = fread(iv, 1, sizeof(iv), fd);
             if (bytes_read != sizeof(iv))
-                printf("error... only read %d of %lu bytes\n", bytes_read, sizeof(iv));
+                ERROR("fread() error... only read %d of %lu bytes\n", bytes_read, sizeof(iv));
             if (fclose(fd))
-                perror("error closing");
+                ERROR("fclose() failed!\n");
 
             /* call dm_GMAC passing in key, iv, ivlen, data (start of ptp header),
              * data len (icvOffset minus IV len, don't want to include IV in the integrity calculation)
@@ -1905,7 +1883,7 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
              */
             if (!dm_GMAC(secOpts->key, iv, sizeof(iv), buf, icvOffset - sizeof(iv),
                          buf + icvOffset, secOpts->icvLength)) {
-                perror("error calculating GMAC");
+                ERROR("Error calculating GMAC in calculateAndPackICV\n");
             }
             /* pack IV in buffer before ICV so receiver will be able to use same IV to verify ICV */
             memcpy(buf + icvOffset - sizeof(iv), iv, sizeof(iv));
@@ -1915,7 +1893,7 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
 
             break;
         default:
-            INFO("error, unknown algTyp");
+            ERROR("Unknown algTyp in calculateAndPackICV\n");
             break;
     }
 }
@@ -1928,7 +1906,7 @@ Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, U
 
     switch (algTyp) {
         case HMAC_SHA256:
-            INFO("REC doing HMAC\n");
+            if (DM_MSGS) INFO("REC doing HMAC\n");
 
             unsigned char *static_digest;
 
@@ -1950,7 +1928,7 @@ Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, U
             }
             break;
         case GMAC_AES256: {
-            INFO("REC doing GMAC\n");
+            if (DM_MSGS) INFO("REC doing GMAC\n");
             /* create local buffer to store calculated icv */
             unsigned char localICV[secOpts->icvLength];
             memset(localICV, 0, sizeof(localICV));
@@ -1959,10 +1937,10 @@ Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, U
              * data (start of ptp header), data len (not including ICV OR IV)
              * output (local buffer created to store this calculation) and icv len
              */
-            if (!dm_GMAC(secOpts->key, buf + icvOffset - IV_LEN, IV_LEN,
-                         buf, icvOffset - IV_LEN,
+            if (!dm_GMAC(secOpts->key, buf + icvOffset - GMAC_IV_LEN, GMAC_IV_LEN,
+                         buf, icvOffset - GMAC_IV_LEN,
                          localICV, secOpts->icvLength)) {
-                perror("error calculating GMAC in ICV verification");
+                ERROR("Error calculating GMAC in ICV verification\n");
             }
 
             /* cmp locally calculated ICV with ICV in rec buf */
@@ -1972,7 +1950,7 @@ Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, U
             break;
         }
         default:
-            INFO("error, unknown algTyp");
+            ERROR("Unknown algTyp in calculateAndVerifyICV\n");
             return FALSE;
     }
     return TRUE;

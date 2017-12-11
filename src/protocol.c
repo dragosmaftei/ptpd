@@ -1394,7 +1394,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 #endif /* RUNTIME_DEBUG */
 
     /*
-     * 'securityEnabled' emulates getting the policy limiting fields from the PTP header and quering the SPD to
+     * 'securityEnabled' emulates getting the policy limiting fields from the PTP header and querying the SPD to
      * answer the question 'do we want security processing on this packet?' if yes, the query would return an SPP
      * which would be used to query the SAD to get the relevant SA, which contains necessary security parameters
      */
@@ -1605,7 +1605,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                         ptpClock->counters.securityErrors++;
                         ptpClock->counters.securityTLVExpectedErrors++;
                         if (DM_MSGS)
-                            INFO("DM: security enabled, expecting secured sync & followup messages, but message is missing security flag in header on seqid %04x\n",
+                            INFO("DM: security enabled, expecting secured pdelay messages, but message is missing security flag in header on seqid %04x\n",
                                  ptpClock->msgTmpHeader.sequenceId);
                         return;
                     }
