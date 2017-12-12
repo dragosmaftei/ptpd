@@ -1744,12 +1744,6 @@ void msgPackSecurityTLV(SecurityTLV *data, Octet *buf)
 UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
 {
     /*
-     * ugly workaround (in the absence of an actual SPD lookup) to make slave using delayed proc. NOT add TLV
-     * in an actual solution, a slave's SPD lookup based on policy limiting fields would return 0, or the SPP
-     * for an SA for immediate processing
-     */
-
-    /*
      * we've "used policy limiting fields to query the SPD" (i.e. in this emulation, just checked 'securityEnabled'),
      * and the query "returned an SPP to query SAD to obtain the relevant SA which contains other security paramaters",
      * (i.e. in this emulation, the parameters were read in from config file)... these parameters include:
@@ -1761,10 +1755,15 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
 
     /*
      * only this is pulled down into a local variable (as opposed to being accessed through rtOpts->securityOpts) since
-     * it might get adjusted for optional fields on a per message basis depending on the key disclosure delay
+     * it might get adjusted for optional fields on a per message basis depending on the key disclosure
      */
     UInteger16 secTLVLen = rtOpts->securityOpts.secTLVLen;
-    /*
+
+    /* DM:TODO determine current time interval,
+     * DM:TODO determine whether to include a disclosed key or not
+     * DM:TODO - this requires access to the message type (i.e. re-parameterize this function) since disclosed key should only be in non-event msgs
+     * DM:TODO - maybe have a boolean that tracks whether the key has been disclosed yet for a given interval?
+     *      - should the key for interval i be disclosed only once? multiple times? how many times?
      * if delayed processing, check key disclosure delay to see if we need to include a disclosed key
      * emulated here very simply for proof of concept as a boolean, but in reality some other mechanism would apply
      */
@@ -1786,7 +1785,13 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
     sec_tlv.tlvType = SECURITY;
     sec_tlv.lengthField = secTLVLen - 4; /* -4 to discount TYPE and LENGTH (2 bytes each) */
     sec_tlv.SPP = rtOpts->securityOpts.SPP;
+
+    /* DM:TODO if delayed, need to figure out time interval, store it in keyID, and use it to pick the right key
+     * from the keychain
+     */
     sec_tlv.keyID = rtOpts->securityOpts.keyID;
+
+    // DM:TODO if disclosing key (should have been determined already), flip the SPI disclosedKey bit
     /* if disclosed key needs to be included, this must be indicated in the secParamIndicator's disclosedKey bit */
     if (rtOpts->securityOpts.delayed && rtOpts->securityOpts.disclosureDelay) {
         sec_tlv.secParamIndicator |= SPI_DISCLOSED_KEY;
@@ -1798,6 +1803,7 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
      */
     msgPackSecurityTLV(&sec_tlv, buf + msg_len);
 
+    // DM:TODO if disclosing key (this can be included in one of the conditionals above), pack the right key
     /* pack the disclosed key if necessary */
     if (rtOpts->securityOpts.delayed && rtOpts->securityOpts.disclosureDelay) {
         /* add disclosed key at 10th byte offset... just 0xdds for testing */
@@ -1817,6 +1823,10 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
         /* don't need to flip the values copied into correctionFieldTmp since they won't be interpreted/used */
         memset(buf + 8, 0, 8); // zero out the correction field
     }
+
+    //DM:TODO need to use the right key.... secOpts passed in for key, keylength, icvlength...
+    // could have a few more pointers, keyChain to point to first one, or trustAnchor, and adjust the 'key' pointer as needed
+    // as we pass through different time intervals
 
     /* passing in security parameters, buffer (start of PTP header), and the ICV offset */
     calculateAndPackICV(&rtOpts->securityOpts, (unsigned char *)buf,

@@ -17,7 +17,7 @@
 
 #define DM_MSGS 1
 /* this is to easily turn on code highlighting for PTPD_SECURITY blocks, should be turned off before compiling */
-#define DEFINE_SECURITY 0
+#define DEFINE_SECURITY 1
 
 #if DEFINE_SECURITY
 #define PTPD_SECURITY

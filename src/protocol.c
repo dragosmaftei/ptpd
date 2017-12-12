@@ -1507,10 +1507,11 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			}
 
 			/*
-			 * now verify that the keyID from our "SA" (i.e. config file in this emulation) is the same as the
-			 * incoming message's TLV's keyID field; check error condition first so we can just return
+			 * now verify (only for immediate) that the keyID from our "SA" (i.e. config file in this emulation)
+			 * is the same as the incoming message's TLV's keyID field;
+			 * if delayed, keyID has different meaning; it signals the current key's time interval
 			 */
-			if (rtOpts->securityOpts.keyID != sec_tlv.keyID) {
+			if (!rtOpts->securityOpts.delayed && rtOpts->securityOpts.keyID != sec_tlv.keyID) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.keyIDMismatchErrors++;
 				if (DM_MSGS)
@@ -1536,9 +1537,21 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				memset(ptpClock->msgIbuf + 8, 0, 8); /* zero out the correction field */
 			}
 
+			/* delayed processing case */
+			if (rtOpts->securityOpts.delayed) {
+				/* - figure out current time interval */
+				/* - if disclosed key, verify it is OK... figure out what time interval it corresponds to, and
+				 * use it to verify all the messages in that bucket
+				 * -- if all messages are good, become not paranoid
+				 * -- if any message failed, become paranoid
+				 * - if i'm not paranoid, store the message in the bucket
+				 * - if i'm paranoid, store the message but return (don't sync with this message)
+				 */
 
-            /* calculate and verify ICV, returns false if verification fails */
-			if (calculateAndVerifyICV(&rtOpts->securityOpts, (unsigned char *)ptpClock->msgIbuf,
+
+			}
+            /* immediate case: calculate and verify ICV, returns false if verification fails, otherwise proceed */
+			else if (calculateAndVerifyICV(&rtOpts->securityOpts, (unsigned char *)ptpClock->msgIbuf,
 								  packetLength + secTLVLen - rtOpts->securityOpts.icvLength) == FALSE) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.icvMismatchErrors++;
@@ -3282,11 +3295,20 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
 #endif /* RUNTIME_DEBUG */
 
 	/*
-     * 'securityEnabled' emulates getting the policy limiting fields from the PTP header and quering the SPD to
+     * 'securityEnabled' emulates getting the policy limiting fields from the PTP header and querying the SPD to
      * answer the question 'do we want security processing on this packet?' if yes, the query would return an SPP
      * which would be used to query the SAD to get the relevant SA, which contains necessary security parameters
      */
-    if (rtOpts->securityEnabled) {
+
+	/*
+    * 2nd condition !(delayed && slave) is an ugly workaround (in the absence of an actual SPD lookup) to make a slave
+    * using delayed proc. NOT add TLV
+    * in an actual solution, a slave's SPD lookup based on policy limiting fields would return 0, or the SPP
+    * for an SA for immediate processing
+    */
+
+	if (rtOpts->securityEnabled &&
+			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
         /* add security TLV, returns size, add it to length of the packet to send */
         packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
     }
@@ -3421,7 +3443,8 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
 #endif /* RUNTIME_DEBUG */
 
-	if (rtOpts->securityEnabled) {
+	if (rtOpts->securityEnabled &&
+		!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
 		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
 	}
@@ -3514,7 +3537,8 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
 #endif /* RUNTIME_DEBUG */
 
-	if (rtOpts->securityEnabled) {
+	if (rtOpts->securityEnabled &&
+			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
 		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
 	}
@@ -3673,7 +3697,8 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
 #endif /* RUNTIME_DEBUG */
 
-	if (rtOpts->securityEnabled) {
+	if (rtOpts->securityEnabled &&
+			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
 		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
 	}
@@ -3756,7 +3781,8 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
 #endif /* RUNTIME_DEBUG */
 
-	if (rtOpts->securityEnabled) {
+	if (rtOpts->securityEnabled &&
+			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
 		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
 	}
@@ -3853,7 +3879,8 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
 #endif /* RUNTIME_DEBUG */
 
-	if (rtOpts->securityEnabled) {
+	if (rtOpts->securityEnabled &&
+			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
 		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
 	}
