@@ -1063,75 +1063,8 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 									"If using immediate security processing, ignore correction field in ICV calculation.");
 
 
-	if (DM_MSGS) {
-		printf("the keystring size is (should always be this): %lu\n", sizeof(rtOpts->securityOpts.keyString));
-		printf("the keystring STRLEN is: %lu\n", strlen(rtOpts->securityOpts.keyString));
-		printf("the keyString is:\n\t");
-		for (int i = 0; i < (sizeof(rtOpts->securityOpts.keyString)); i++)
-			printf("0x%02x ", rtOpts->securityOpts.keyString[i]);
-		printf("\n");
-	}
-
-    if (rtOpts->securityEnabled) {
-        stringToBinary(rtOpts->securityOpts.keyString, rtOpts->securityOpts.key, MAX_SEC_KEY_LEN);
-		stringToBinary(rtOpts->securityOpts.integrityAlgTypOIDString, rtOpts->securityOpts.integrityAlgTypOID, MAX_OID_LEN);
-
-		if (DM_MSGS) {
-			printf("the OID is: \n\t");
-			for (int i = 0; i < 20; i++)
-				printf("0x%02x ", rtOpts->securityOpts.integrityAlgTypOID[i]);
-			printf("\n");
-
-			printf("the OID size is: %d\n", rtOpts->securityOpts.integrityAlgTypOID[1] + 2);
-		}
-
-		/* set integrityAlgTyp enum accordingly */
-		if (memcmp(HMAC_SHA256_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(HMAC_SHA256_OID) - 1) == 0) {
-		    rtOpts->securityOpts.integrityAlgTyp = HMAC_SHA256;
-            rtOpts->securityOpts.icvLength = HMAC_SHA256_ICV_LEN;
-            rtOpts->securityOpts.secTLVLen = SEC_TLV_CONSTANT_LEN + HMAC_SHA256_ICV_LEN;
-        } else if (memcmp(GMAC_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(GMAC_OID) - 1) == 0) {
-            rtOpts->securityOpts.integrityAlgTyp = GMAC_AES256;
-            /*
-             * for GMAC, the calculated MAC/tag/ICV is 16, but it must be sent along with the randomized IV (12)
-             * that it gets generated with... thus total secTLV len includes IV
-             */
-            rtOpts->securityOpts.icvLength = GMAC_ICV_LEN;
-            rtOpts->securityOpts.secTLVLen = SEC_TLV_CONSTANT_LEN + GMAC_IV_LEN + GMAC_ICV_LEN;
-        } else {
-            WARNING("The algorithm OID provided does not match; using HMAC as default\n");
-        }
-
-
-		if (DM_MSGS) {
-			switch (rtOpts->securityOpts.integrityAlgTyp) {
-				case GMAC_AES256:
-					printf("it's GMAC\n");
-					break;
-				case HMAC_SHA256:
-					printf("it's HMAC\n");
-					break;
-			}
-		}
-
-
-		rtOpts->securityOpts.SPP =  (UInteger8) strtoul(rtOpts->securityOpts.SPPString, 0, 16); // base 16
-        rtOpts->securityOpts.keyID =  (UInteger32) strtoul(rtOpts->securityOpts.keyIDString, 0, 16); // base 16
-
-        /* set the key length based on the inputted key string from the config file */
-        rtOpts->securityOpts.keyLen = strlen(rtOpts->securityOpts.keyString) / 2;
-    }
-
-	if (DM_MSGS) {
-		printf("the key is (length: %d):\n\t", rtOpts->securityOpts.keyLen);
-		for (int i = 0; i < 32; i++) {
-			printf("0x%02x ", rtOpts->securityOpts.key[i]);
-		}
-		printf("\nSPP: %02x\nkeyid: %08x\n",
-			   rtOpts->securityOpts.SPP, rtOpts->securityOpts.keyID);
-	}
-
 #endif /* PTPD_SECURITY */
+
 
 	parseResult &= configMapBoolean(opCode, opArg, dict, target, "ptpengine:dot1as", PTPD_UPDATE_DATASETS, &rtOpts->dot1AS, rtOpts->dot1AS,
 		"Enable TransportSpecific field compatibility with 802.1AS / AVB (requires Ethernet transport)");
@@ -2640,6 +2573,79 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 			snprintf(rtOpts->lockFile, PATH_MAX,
 				"%s/%s", rtOpts->lockDirectory, DEFAULT_LOCKFILE_NAME);
 	}
+
+#ifdef PTPD_SECURITY
+    /*
+     * set various security related variables based on the input
+     */
+    if (DM_MSGS) {
+        printf("the keystring size is (should always be this): %lu\n", sizeof(rtOpts->securityOpts.keyString));
+        printf("the keystring STRLEN is: %lu\n", strlen(rtOpts->securityOpts.keyString));
+        printf("the keyString is:\n\t");
+        for (int i = 0; i < (sizeof(rtOpts->securityOpts.keyString)); i++)
+            printf("0x%02x ", rtOpts->securityOpts.keyString[i]);
+        printf("\n");
+    }
+
+    if (rtOpts->securityEnabled) {
+        stringToBinary(rtOpts->securityOpts.keyString, rtOpts->securityOpts.key, MAX_SEC_KEY_LEN);
+        stringToBinary(rtOpts->securityOpts.integrityAlgTypOIDString, rtOpts->securityOpts.integrityAlgTypOID, MAX_OID_LEN);
+
+        if (DM_MSGS) {
+            printf("the OID is: \n\t");
+            for (int i = 0; i < 20; i++)
+                printf("0x%02x ", rtOpts->securityOpts.integrityAlgTypOID[i]);
+            printf("\n");
+
+            printf("the OID size is: %d\n", rtOpts->securityOpts.integrityAlgTypOID[1] + 2);
+        }
+
+        /* set integrityAlgTyp enum accordingly */
+        if (memcmp(HMAC_SHA256_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(HMAC_SHA256_OID) - 1) == 0) {
+            rtOpts->securityOpts.integrityAlgTyp = HMAC_SHA256;
+            rtOpts->securityOpts.icvLength = HMAC_SHA256_ICV_LEN;
+            rtOpts->securityOpts.secTLVLen = SEC_TLV_CONSTANT_LEN + HMAC_SHA256_ICV_LEN;
+        } else if (memcmp(GMAC_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(GMAC_OID) - 1) == 0) {
+            rtOpts->securityOpts.integrityAlgTyp = GMAC_AES256;
+            /*
+             * for GMAC, the calculated MAC/tag/ICV is 16, but it must be sent along with the randomized IV (12)
+             * that it gets generated with... thus total secTLV len includes IV
+             */
+            rtOpts->securityOpts.icvLength = GMAC_ICV_LEN;
+            rtOpts->securityOpts.secTLVLen = SEC_TLV_CONSTANT_LEN + GMAC_IV_LEN + GMAC_ICV_LEN;
+        } else {
+            WARNING("The algorithm OID provided does not match; using HMAC as default\n");
+        }
+
+        if (DM_MSGS) {
+            switch (rtOpts->securityOpts.integrityAlgTyp) {
+                case GMAC_AES256:
+                    printf("it's GMAC\n");
+                    break;
+                case HMAC_SHA256:
+                    printf("it's HMAC\n");
+                    break;
+            }
+        }
+
+        rtOpts->securityOpts.SPP =  (UInteger8) strtoul(rtOpts->securityOpts.SPPString, 0, 16); // base 16
+        rtOpts->securityOpts.keyID =  (UInteger32) strtoul(rtOpts->securityOpts.keyIDString, 0, 16); // base 16
+
+        /* set the key length based on the inputted key string from the config file */
+        rtOpts->securityOpts.keyLen = strlen(rtOpts->securityOpts.keyString) / 2;
+    }
+
+    if (DM_MSGS) {
+        printf("the key is (length: %d):\n\t", rtOpts->securityOpts.keyLen);
+        for (int i = 0; i < 32; i++) {
+            printf("0x%02x ", rtOpts->securityOpts.key[i]);
+        }
+        printf("\nSPP: %02x\nkeyid: %08x\n",
+               rtOpts->securityOpts.SPP, rtOpts->securityOpts.keyID);
+    }
+
+#endif /* PTPD_SECURITY */
+    
 
 /* ==== END additional logic */
 
