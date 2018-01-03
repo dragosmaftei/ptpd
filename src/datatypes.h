@@ -361,10 +361,6 @@ typedef struct {
      */
     unsigned char *trustAnchor;
 
-    //DM:TODO this won't work since rtOpts is const in issue____ functions......
-    /* during delayed processing, based on certain criteria, these will get set appropriately */
-    UInteger16 currentInterval;
-    Boolean discloseKey; /* true if we should disclose a key */
 
     /* ==================== other variables ======================= */
 

@@ -1743,7 +1743,7 @@ void msgPackSecurityTLV(SecurityTLV *data, Octet *buf)
  * whether to consider including a disclosed key in this message (should not disclose key in event messages)
  * this should be called after the buffer has been packed (including header) for the type of message
  */
-UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts, Boolean general)
+UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgClassGeneral)
 {
     /*
      * we've "used policy limiting fields to query the SPD" (i.e. in this emulation, just checked 'securityEnabled'),
@@ -1756,37 +1756,42 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts, Boolean general
      */
 
     /*
-     * only this is pulled down into a local variable (as opposed to being accessed through rtOpts->securityOpts) since
+     * only this is pulled down into a local variable (as opposed to being accessed through secOpts) since
      * it might get adjusted for optional fields on a per message basis depending on the key disclosure
      */
-    UInteger16 secTLVLen = rtOpts->securityOpts.secTLVLen;
+    UInteger16 secTLVLen = secOpts->secTLVLen;
 
-    Boolean delayed = rtOpts->securityOpts.delayed;
+    /* for delayed processing, we will need to calculate current interval */
+    UInteger16 currentInterval = 0;
+    Integer16 discKeyInterval = 0; /* may be negative */
+    Boolean discloseKey = FALSE; /* true if we should disclose a key */
 
     /* calculate and set the current time interval */
-    if (delayed) {
+    if (secOpts->delayed) {
         TimeInternal currentTime;
         getTime(&currentTime);
         TimeInternal elapsed;
         /* result, x - y */
-        subTime(&elapsed, &currentTime, &rtOpts->securityOpts.startTime);
-        //rtOpts->securityOpts.currentInterval = timeInternalToDouble(&elapsed) / rtOpts->securityOpts.intervalDuration;
+        subTime(&elapsed, &currentTime, &secOpts->startTime);
+        /* implicit cast here is fine, we want the remainder to be dropped */
+        currentInterval = timeInternalToDouble(&elapsed) / secOpts->intervalDuration;
+
+        /* DM:TODO verify this wraparound works... for test implementation only... when keychain is exhausted,
+         * new keychain should be created */
+        currentInterval = currentInterval % secOpts->chainLength;
+
+        discKeyInterval = currentInterval - secOpts->disclosureDelay;
+        /* disclose a key for messages from a previous interval only if:
+         * - this is a general message (non-event message), AND
+         * - we're not currently in the first <disclosureDelay> intervals (i.e. if disclosureDelay is 2, we can't
+         *   disclose a key if we're in the first 2 intervals, interval 0 or 1
+         */
+        if (msgClassGeneral && (discKeyInterval >= 0)) {
+            discloseKey = TRUE;
+            /* since we're disclosing a key, adjust length accordingly (add key length) */
+            secTLVLen += secOpts->keyLen;
+        }
     }
-
-
-     /*
-     * DM:TODO determine whether to include a disclosed key or not
-     * DM:TODO - this requires access to the message type (i.e. re-parameterize this function) since disclosed key should only be in non-event msgs
-     * DM:TODO - maybe have a boolean that tracks whether the key has been disclosed yet for a given interval?
-     *      - should the key for interval i be disclosed only once? multiple times? how many times?
-     * if delayed processing, check key disclosure delay to see if we need to include a disclosed key
-     * emulated here very simply for proof of concept as a boolean, but in reality some other mechanism would apply
-     */
-    if (rtOpts->securityOpts.delayed && rtOpts->securityOpts.disclosureDelay) {
-        /* adjust length accordingly (add key length) */
-        secTLVLen += rtOpts->securityOpts.keyLen;
-    } /* else, either not delayed, or delayed, but don't need to disclose key in this TLV, so don't adjust len */
-
 
     *(UInteger8 *) (buf + 6) |= PTP_SECURITY; /* adding security flag to the header */
 
@@ -1794,21 +1799,26 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts, Boolean general
     /* adjusting the header's message length field to account for sec TLV */
     *(UInteger16 *) (buf + 2) = flip16(msg_len + secTLVLen);
 
-    /* make TLV struct and populate it before packing the buffer */
+    /*
+     * make TLV struct and populate it (albeit with only the constant-length components of the TLV) before packing the
+     * buffer via the packing function; this is preferable to packing everything by hand directly into the buffer
+     */
     SecurityTLV sec_tlv;
     memset(&sec_tlv, 0, SEC_TLV_CONSTANT_LEN);
     sec_tlv.tlvType = SECURITY;
     sec_tlv.lengthField = secTLVLen - 4; /* -4 to discount TYPE and LENGTH (2 bytes each) */
-    sec_tlv.SPP = rtOpts->securityOpts.SPP;
+    sec_tlv.SPP = secOpts->SPP;
 
-    /* DM:TODO if delayed, need to figure out time interval, store it in keyID, and use it to pick the right key
-     * from the keychain
-     */
-    sec_tlv.keyID = rtOpts->securityOpts.keyID;
 
-    // DM:TODO if disclosing key (should have been determined already), flip the SPI disclosedKey bit
+    /* for delayed, keyID field stores the current time interval */
+    if (secOpts->delayed) {
+        sec_tlv.keyID = currentInterval;
+    } else {
+        sec_tlv.keyID = secOpts->keyID;
+    }
+
     /* if disclosed key needs to be included, this must be indicated in the secParamIndicator's disclosedKey bit */
-    if (rtOpts->securityOpts.delayed && rtOpts->securityOpts.disclosureDelay) {
+    if (discloseKey) {
         sec_tlv.secParamIndicator |= SPI_DISCLOSED_KEY;
     } /* else this flag will remain 0, as the whole sec_tlv was initialized to 0 */
 
@@ -1818,11 +1828,25 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts, Boolean general
      */
     msgPackSecurityTLV(&sec_tlv, buf + msg_len);
 
-    // DM:TODO if disclosing key (this can be included in one of the conditionals above), pack the right key
     /* pack the disclosed key if necessary */
-    if (rtOpts->securityOpts.delayed && rtOpts->securityOpts.disclosureDelay) {
+    if (discloseKey) {
+        // DM:TODO get key from interval = curInterval - disclosureDelay
+        // DM:TODO this disclosed key is right from the keychain, NOT the generated ICV key
+        int discKeyIndex = secOpts->chainLength - 1 - discKeyInterval;
+        unsigned char *disclosedKey = secOpts->keyChain[discKeyIndex];
+
+        /* DM:TODO debug printing the disclosed key*/
+        unsigned char tmpBuf[256];
+        memset(tmpBuf, 0, sizeof(tmpBuf));
+        memcpy(tmpBuf, disclosedKey, secOpts->keyLen);
+        tmpBuf[secOpts->keyLen] = '\0';
+        INFO("DM: currentInterval: %d, disclosing keyChain[%d] from interval %d: %02x...%02x\n",
+             currentInterval, discKeyIndex, discKeyInterval, tmpBuf[0], tmpBuf[secOpts->keyLen - 1]);
+
         /* add disclosed key at 10th byte offset... just 0xdds for testing */
-        memset(buf + msg_len + SEC_TLV_CONSTANT_LEN, 0xdd, rtOpts->securityOpts.keyLen);
+        memcpy(buf + msg_len + SEC_TLV_CONSTANT_LEN, disclosedKey, secOpts->keyLen);
+
+        //memset(buf + msg_len + SEC_TLV_CONSTANT_LEN, 0xdd, secOpts->keyLen);
     }
 
     /*
@@ -1831,30 +1855,32 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts, Boolean general
      */
     Integer64 correctionFieldTmp;
 
-    if (rtOpts->securityOpts.delayed ||
-        (!rtOpts->securityOpts.delayed && rtOpts->securityOpts.immIgnoreCorrection)) {
+    if (secOpts->delayed ||
+        (!secOpts->delayed && secOpts->immIgnoreCorrection)) {
         memcpy(&correctionFieldTmp.msb, (buf + 8), 4);
         memcpy(&correctionFieldTmp.lsb, (buf + 12), 4);
         /* don't need to flip the values copied into correctionFieldTmp since they won't be interpreted/used */
         memset(buf + 8, 0, 8); // zero out the correction field
     }
 
-    //DM:TODO need to use the right key.... secOpts passed in for key, keylength, icvlength...
-    //DM:TODO need to reparameterize calculateAndPackICV and calculateAndVerifyICV to pass a pointer to the key
-    //DM:TODO to use, since we can't change the key pointer for delayed processing since rtOpts is const...
-    // could have a few more pointers, keyChain to point to first one, or trustAnchor, and adjust the 'key' pointer as needed
-    // as we pass through different time intervals
+    /* for immediate, just use the one key */
+    unsigned char *key = secOpts->key;
 
-    /* passing in security parameters, buffer (start of PTP header), and the ICV offset */
-    calculateAndPackICV(&rtOpts->securityOpts, (unsigned char *)buf,
-                        msg_len + secTLVLen - rtOpts->securityOpts.icvLength);
+    if (secOpts->delayed) {
+        // DM:TODO need function to generate ICV key from keychain key
+
+    }
+
+    /* passing in security parameters, buffer (start of PTP header), ICV offset, and the key */
+    calculateAndPackICV(secOpts, (unsigned char *)buf,
+                        msg_len + secTLVLen - secOpts->icvLength, key);
 
     /*
      * for delayed (or if imm but ignoring correction field),
      * restore correctionField to its previous value before it was zeroed out
      */
-    if (rtOpts->securityOpts.delayed ||
-        (!rtOpts->securityOpts.delayed && rtOpts->securityOpts.immIgnoreCorrection)) {
+    if (secOpts->delayed ||
+        (!secOpts->delayed && secOpts->immIgnoreCorrection)) {
         memcpy((buf + 8), &correctionFieldTmp.msb, 4);
         memcpy((buf + 12), &correctionFieldTmp.lsb, 4);
     }
@@ -1865,8 +1891,10 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts, Boolean general
 /*
  *
  * buf is the start of the PTP header
+ * need secOpts for algTyp, keyLen, icvLength, and key... for delayed, key changes based on time interval, and we
+ * can't change the secOpts->key pointer (due to rtOpts being const back in issue<msgtype>) so a pointer needs to be passed in
  */
-void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteger16 icvOffset) {
+void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteger16 icvOffset, unsigned char *key) {
 
     IntegrityAlgTyp algTyp = secOpts->integrityAlgTyp;
 
@@ -1881,7 +1909,7 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
              * calculating it this way accounts for different alg types, as well as for the disclosed key, if present,
              * if doing delayed processing
              */
-            static_digest = dm_HMAC(dm_EVP_sha256(), secOpts->key, secOpts->keyLen,
+            static_digest = dm_HMAC(dm_EVP_sha256(), key, secOpts->keyLen,
                                     buf, icvOffset, NULL, NULL);
 
             /* truncate the digest to 128 bits and pack it by copying just 16 bytes directly into the buffer */
@@ -1907,7 +1935,7 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
              * data len (icvOffset minus IV len, don't want to include IV in the integrity calculation)
              * icv start / where to place the calculated icv, and icv len
              */
-            if (!dm_GMAC(secOpts->key, iv, sizeof(iv), buf, icvOffset - sizeof(iv),
+            if (!dm_GMAC(key, iv, sizeof(iv), buf, icvOffset - sizeof(iv),
                          buf + icvOffset, secOpts->icvLength)) {
                 ERROR("Error calculating GMAC in calculateAndPackICV\n");
             }
@@ -1925,7 +1953,7 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
 /*
  * buf is the start of PTP header
  */
-Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, UInteger16 icvOffset) {
+Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, UInteger16 icvOffset, unsigned char *key) {
     IntegrityAlgTyp algTyp = secOpts->integrityAlgTyp;
 
     switch (algTyp) {
@@ -1939,7 +1967,7 @@ Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, U
              * calculating it this way accounts for different alg types, as well as for the disclosed key, if present,
              * if doing delayed processing
              */
-            static_digest = dm_HMAC(dm_EVP_sha256(), secOpts->key, secOpts->keyLen,
+            static_digest = dm_HMAC(dm_EVP_sha256(), key, secOpts->keyLen,
                                     buf, icvOffset, NULL, NULL);
 
             /*
@@ -1960,7 +1988,7 @@ Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, U
              * data (start of ptp header), data len (not including ICV OR IV)
              * output (local buffer created to store this calculation) and icv len
              */
-            if (!dm_GMAC(secOpts->key, buf + icvOffset - GMAC_IV_LEN, GMAC_IV_LEN,
+            if (!dm_GMAC(key, buf + icvOffset - GMAC_IV_LEN, GMAC_IV_LEN,
                          buf, icvOffset - GMAC_IV_LEN,
                          localICV, secOpts->icvLength)) {
                 ERROR("Error calculating GMAC in ICV verification\n");

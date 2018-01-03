@@ -1399,7 +1399,10 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
      * which would be used to query the SAD to get the relevant SA, which contains necessary security parameters
      */
     if (rtOpts->securityEnabled) {
-        /* our emulated SPD query resulted in YES, so next we must check that the security flag is set in the header */
+		/* get securityOpts into a local pointer to simplify */
+		SecurityOpts *secOpts = &rtOpts->securityOpts;
+
+		/* our emulated SPD query resulted in YES, so next we must check that the security flag is set in the header */
         if ((ptpClock->msgTmpHeader.flagField0 & PTP_SECURITY) == PTP_SECURITY) {
             /* figure out packet length based on message and unpack the TLV from buffer into local struct */
             UInteger16 packetLength;
@@ -1460,7 +1463,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
              * the config file) matches the SPP on the incoming message's security TLV
              * check error condition first so we can just return
              */
-			if (sec_tlv.SPP != rtOpts->securityOpts.SPP) {
+			if (sec_tlv.SPP != secOpts->SPP) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.SPPMismatchErrors++;
 				if (DM_MSGS)
@@ -1480,16 +1483,16 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
      		 * from our SA should match lengthField of incoming TLV
              */
 
-			UInteger16 secTLVLen = rtOpts->securityOpts.secTLVLen;
+			UInteger16 secTLVLen = secOpts->secTLVLen;
 
 			/* if delayed processing, check SPI for flag indicating the presence of the disclosed key */
-			if (rtOpts->securityOpts.delayed &&
+			if (secOpts->delayed &&
 				((sec_tlv.secParamIndicator & SPI_DISCLOSED_KEY) == SPI_DISCLOSED_KEY)) {
 				/*
                  * we're using delayed processing, and the SPI indicates that this TLV contains a disclosed key
                  * so adjust length accordingly (add key length)
                  */
-				secTLVLen += rtOpts->securityOpts.keyLen;
+				secTLVLen += secOpts->keyLen;
 
 			} /* else, either not delayed, or delayed, but no disclosed key in this TLV, so don't adjust len */
 
@@ -1511,7 +1514,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			 * is the same as the incoming message's TLV's keyID field;
 			 * if delayed, keyID has different meaning; it signals the current key's time interval
 			 */
-			if (!rtOpts->securityOpts.delayed && rtOpts->securityOpts.keyID != sec_tlv.keyID) {
+			if (!secOpts->delayed && secOpts->keyID != sec_tlv.keyID) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.keyIDMismatchErrors++;
 				if (DM_MSGS)
@@ -1529,16 +1532,20 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
              * fill it back in the buffer later
              */
 			Integer64 correctionFieldTmp;
-			if (rtOpts->securityOpts.delayed ||
-				(!rtOpts->securityOpts.delayed && rtOpts->securityOpts.immIgnoreCorrection)) {
+			if (secOpts->delayed ||
+				(!secOpts->delayed && secOpts->immIgnoreCorrection)) {
 				memcpy(&correctionFieldTmp.msb, (ptpClock->msgIbuf + 8), 4);
 				memcpy(&correctionFieldTmp.lsb, (ptpClock->msgIbuf + 12), 4);
 				/* don't need to flip the values copied into correctionFieldTmp since they won't be interpreted/used */
 				memset(ptpClock->msgIbuf + 8, 0, 8); /* zero out the correction field */
 			}
 
+			/* for immediate, just use the one key */
+			unsigned char *key = secOpts->key;
+
 			/* delayed processing case */
-			if (rtOpts->securityOpts.delayed) {
+			if (secOpts->delayed) {
+				//DM:TODO delayed receive processing... interval calc, safe packet test, key verification, buffers...
 				/* - figure out current time interval */
 				/* - if disclosed key, verify it is OK... figure out what time interval it corresponds to, and
 				 * use it to verify all the messages in that bucket
@@ -1550,9 +1557,12 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
 
 			}
-            /* immediate case: calculate and verify ICV, returns false if verification fails, otherwise proceed */
-			else if (calculateAndVerifyICV(&rtOpts->securityOpts, (unsigned char *)ptpClock->msgIbuf,
-								  packetLength + secTLVLen - rtOpts->securityOpts.icvLength) == FALSE) {
+            /*
+             * immediate case: calculate and verify ICV, passing in secOpts, buffer, icvOffset, and key
+             * returns false if verification fails, otherwise proceed
+             */
+			else if (calculateAndVerifyICV(secOpts, (unsigned char *)ptpClock->msgIbuf,
+								  packetLength + secTLVLen - secOpts->icvLength, key) == FALSE) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.icvMismatchErrors++;
 				if (DM_MSGS)
@@ -1564,8 +1574,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
              * for delayed, restore correctionField to its previous value before it was zeroed out (might not even be
              * strictly necessary since the header information from msgIbuf was already pulled out into msgTmpHeader
              */
-			if (rtOpts->securityOpts.delayed ||
-				(!rtOpts->securityOpts.delayed && rtOpts->securityOpts.immIgnoreCorrection)) {
+			if (secOpts->delayed ||
+				(!secOpts->delayed && secOpts->immIgnoreCorrection)) {
 				memcpy((ptpClock->msgIbuf + 8), &correctionFieldTmp.msb, 4);
 				memcpy((ptpClock->msgIbuf + 12), &correctionFieldTmp.lsb, 4);
 			}
@@ -1578,9 +1588,9 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
             /* we might want to accept these unsecured messages anyway, based on our configuration settings */
             switch (ptpClock->msgTmpHeader.messageType) {
                 case ANNOUNCE:
-                    if ((!rtOpts->securityOpts.masterAcceptInsecureAnnounce && !rtOpts->securityOpts.slaveAcceptInsecureAnnounce) ||
-                        (!rtOpts->securityOpts.masterAcceptInsecureAnnounce && ptpClock->portDS.portState == PTP_MASTER) ||
-                        (!rtOpts->securityOpts.slaveAcceptInsecureAnnounce && ptpClock->portDS.portState == PTP_SLAVE)) {
+                    if ((!secOpts->masterAcceptInsecureAnnounce && !secOpts->slaveAcceptInsecureAnnounce) ||
+                        (!secOpts->masterAcceptInsecureAnnounce && ptpClock->portDS.portState == PTP_MASTER) ||
+                        (!secOpts->slaveAcceptInsecureAnnounce && ptpClock->portDS.portState == PTP_SLAVE)) {
                         ptpClock->counters.securityErrors++;
                         ptpClock->counters.securityTLVExpectedErrors++;
                         if (DM_MSGS)
@@ -1594,9 +1604,9 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                     /* just fall through to followup case */
                 case FOLLOW_UP:
                     /* for both sync and followup messages */
-                    if ((!rtOpts->securityOpts.masterAcceptInsecureSyncFollowup && !rtOpts->securityOpts.slaveAcceptInsecureSyncFollowup) ||
-                        (!rtOpts->securityOpts.masterAcceptInsecureSyncFollowup && ptpClock->portDS.portState == PTP_MASTER) ||
-                        (!rtOpts->securityOpts.slaveAcceptInsecureSyncFollowup && ptpClock->portDS.portState == PTP_SLAVE)) {
+                    if ((!secOpts->masterAcceptInsecureSyncFollowup && !secOpts->slaveAcceptInsecureSyncFollowup) ||
+                        (!secOpts->masterAcceptInsecureSyncFollowup && ptpClock->portDS.portState == PTP_MASTER) ||
+                        (!secOpts->slaveAcceptInsecureSyncFollowup && ptpClock->portDS.portState == PTP_SLAVE)) {
                         ptpClock->counters.securityErrors++;
                         ptpClock->counters.securityTLVExpectedErrors++;
                         if (DM_MSGS)
@@ -1612,9 +1622,9 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                     /* just fall through to pdelayrespfollowup case */
                 case PDELAY_RESP_FOLLOW_UP:
                     /* for all pdelay messages */
-                    if ((!rtOpts->securityOpts.masterAcceptInsecurePdelays && !rtOpts->securityOpts.slaveAcceptInsecurePdelays) ||
-                        (!rtOpts->securityOpts.masterAcceptInsecurePdelays && ptpClock->portDS.portState == PTP_MASTER) ||
-                        (!rtOpts->securityOpts.slaveAcceptInsecurePdelays && ptpClock->portDS.portState == PTP_SLAVE)) {
+                    if ((!secOpts->masterAcceptInsecurePdelays && !secOpts->slaveAcceptInsecurePdelays) ||
+                        (!secOpts->masterAcceptInsecurePdelays && ptpClock->portDS.portState == PTP_MASTER) ||
+                        (!secOpts->slaveAcceptInsecurePdelays && ptpClock->portDS.portState == PTP_SLAVE)) {
                         ptpClock->counters.securityErrors++;
                         ptpClock->counters.securityTLVExpectedErrors++;
                         if (DM_MSGS)
@@ -3294,6 +3304,31 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
 		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
 #endif /* RUNTIME_DEBUG */
 
+    // DM:TODO remove these debugs
+    // debug trying to see what time is
+    TimeInternal myt;
+    getTime(&myt);
+    char tmpBuf[200];
+    memset(tmpBuf, 0, sizeof(tmpBuf));
+    snprint_TimeInternal(tmpBuf, sizeof(tmpBuf), &myt);
+    //INFO("DM: time (TimeInternal) as string is: %s\n", tmpBuf);
+    //timeInternal_display(&myt); // this uses DBG which only works if all DBG levels are enabled... annoying
+    //INFO("DM: time (TimeInternal) as double: %f\n", timeInternalToDouble(&myt)); works
+
+    // debug print elapsed time since startTime: result, x - y
+    TimeInternal elapsed;
+    memset(tmpBuf, 0, sizeof(tmpBuf));
+    subTime(&elapsed, &myt, &rtOpts->securityOpts.startTime);
+
+    snprint_TimeInternal(tmpBuf, sizeof(tmpBuf), &elapsed);
+    //INFO("DM: cur time - start time is: %s\n", tmpBuf);
+
+    // DM: debug printing the current time interval
+    int interval = timeInternalToDouble(&elapsed) / rtOpts->securityOpts.intervalDuration;
+    interval = interval % rtOpts->securityOpts.chainLength;
+    INFO("DM: current interval: %d\n", interval);
+
+
 	/*
      * 'securityEnabled' emulates getting the policy limiting fields from the PTP header and querying the SPD to
      * answer the question 'do we want security processing on this packet?' if yes, the query would return an SPP
@@ -3310,30 +3345,8 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
         /* add security TLV, returns size, add it to length of the packet to send */
-        packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts, TRUE);
+        packetLength += addSecurityTLV(ptpClock->msgObuf, &rtOpts->securityOpts, TRUE);
     }
-
-	// DM: debug trying to see what time is
-    TimeInternal myt;
-    getTime(&myt);
-	char tmpBuf[200];
-	memset(tmpBuf, 0, sizeof(tmpBuf));
-	snprint_TimeInternal(tmpBuf, sizeof(tmpBuf), &myt);
-    INFO("DM: time (TimeInternal) as string is: %s\n", tmpBuf);
-    //timeInternal_display(&myt); // this uses DBG which only works if all DBG levels are enabled... annoying
-    //INFO("DM: time (TimeInternal) as double: %f\n", timeInternalToDouble(&myt)); works
-
-	// debug print elapsed time since startTime: result, x - y
-	TimeInternal elapsed;
-	memset(tmpBuf, 0, sizeof(tmpBuf));
-	subTime(&elapsed, &myt, &rtOpts->securityOpts.startTime);
-
-	snprint_TimeInternal(tmpBuf, sizeof(tmpBuf), &elapsed);
-	INFO("DM: cur time - start time is: %s\n", tmpBuf);
-
-    // DM: debug printing the current time interval
-    int interval = timeInternalToDouble(&elapsed) / rtOpts->securityOpts.intervalDuration;
-    INFO("DM: current interval: %d\n", interval);
 
 #ifdef RUNTIME_DEBUG
 
@@ -3469,7 +3482,7 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 	if (rtOpts->securityEnabled &&
 		!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts, FALSE);
+		packetLength += addSecurityTLV(ptpClock->msgObuf, &rtOpts->securityOpts, FALSE);
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3563,7 +3576,7 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts, TRUE);
+		packetLength += addSecurityTLV(ptpClock->msgObuf, &rtOpts->securityOpts, TRUE);
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3723,7 +3736,7 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts, FALSE);
+		packetLength += addSecurityTLV(ptpClock->msgObuf, &rtOpts->securityOpts, FALSE);
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3807,7 +3820,7 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts, FALSE);
+		packetLength += addSecurityTLV(ptpClock->msgObuf, &rtOpts->securityOpts, FALSE);
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3905,7 +3918,7 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts, TRUE);
+		packetLength += addSecurityTLV(ptpClock->msgObuf, &rtOpts->securityOpts, TRUE);
 	}
 
 #ifdef RUNTIME_DEBUG

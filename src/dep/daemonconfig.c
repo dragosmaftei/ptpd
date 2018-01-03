@@ -2618,10 +2618,9 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
         printf("\n");
     }
 
-
-
     if (rtOpts->securityEnabled) {
 
+        /* get secOpts pointer into local variable for simplicity */
         SecurityOpts *secOpts = &rtOpts->securityOpts;
 
         /* set the key length based on the inputted key string from the config file */
@@ -2666,7 +2665,12 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
                     generate_chain(secOpts->keyChain, secOpts->keyLen, secOpts->chainLength);
                 }
 
+                /*
+                 * setting the key pointer to the first usable key (interval 0)... this is actually unnecessary since
+                 * we won't even be using the key pointer at all in delayed, instead we will index into the keychain
+                 */
                 secOpts->key = secOpts->keyChain[secOpts->chainLength - 1];
+                /* trust anchor points to the last key in the chain (not a usable key, only used for verification) */
                 secOpts->trustAnchor = secOpts->keyChain[secOpts->chainLength];
             }
 
