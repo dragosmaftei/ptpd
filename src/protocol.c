@@ -1247,7 +1247,7 @@ recordTimingMeasurement(PtpClock *ptpClock, Enumeration4Lower type, Boolean recv
 	struct timespec *totals;
     struct timespec *array;
 
-	INFO("DM: recordTimingMeasurement: type is: %02x\n", type);
+	//INFO("DM: recordTimingMeasurement: type is: %02x\n", type);
 
 	switch (type) {
 		case ANNOUNCE:
@@ -3310,10 +3310,33 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
         /* add security TLV, returns size, add it to length of the packet to send */
-        packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
+        packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts, TRUE);
     }
 
+	// DM: debug trying to see what time is
+    TimeInternal myt;
+    getTime(&myt);
+	char tmpBuf[200];
+	memset(tmpBuf, 0, sizeof(tmpBuf));
+	snprint_TimeInternal(tmpBuf, sizeof(tmpBuf), &myt);
+    INFO("DM: time (TimeInternal) as string is: %s\n", tmpBuf);
+    //timeInternal_display(&myt); // this uses DBG which only works if all DBG levels are enabled... annoying
+    //INFO("DM: time (TimeInternal) as double: %f\n", timeInternalToDouble(&myt)); works
+
+	// debug print elapsed time since startTime: result, x - y
+	TimeInternal elapsed;
+	memset(tmpBuf, 0, sizeof(tmpBuf));
+	subTime(&elapsed, &myt, &rtOpts->securityOpts.startTime);
+
+	snprint_TimeInternal(tmpBuf, sizeof(tmpBuf), &elapsed);
+	INFO("DM: cur time - start time is: %s\n", tmpBuf);
+
+    // DM: debug printing the current time interval
+    int interval = timeInternalToDouble(&elapsed) / rtOpts->securityOpts.intervalDuration;
+    INFO("DM: current interval: %d\n", interval);
+
 #ifdef RUNTIME_DEBUG
+
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
 		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
 
@@ -3446,7 +3469,7 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 	if (rtOpts->securityEnabled &&
 		!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
+		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts, FALSE);
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3540,7 +3563,7 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
+		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts, TRUE);
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3700,7 +3723,7 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
+		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts, FALSE);
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3784,7 +3807,7 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
+		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts, FALSE);
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3882,7 +3905,7 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts);
+		packetLength += addSecurityTLV(ptpClock->msgObuf, rtOpts, TRUE);
 	}
 
 #ifdef RUNTIME_DEBUG

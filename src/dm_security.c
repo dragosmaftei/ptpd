@@ -6,6 +6,30 @@
 //#include <openssl/evp.h> /* this has EVP_sha256() only */
 
 /*
+ * base points to a key upon which n more keys will be based
+ */
+void generate_chain(unsigned char **base, int key_len, int n) {
+    if (n == 0)
+        return;
+
+    /* hash over 0 to generate key chain */
+    unsigned char message = 0;
+    int message_len = 1;
+
+    /*
+     * n more keys need to be generated, so generate the next one, using *base as the key;
+     * store it in the next slot in the chain
+     */
+    HMAC(EVP_sha256(),
+         (void *)base[0], key_len,
+         &message, message_len,
+         base[1], 0);
+
+    /* next call uses newly generated key as a base */
+    generate_chain(base + 1, key_len, n - 1);
+}
+
+/*
  * just call the actual openssl version
  */
 void *dm_EVP_sha256() {

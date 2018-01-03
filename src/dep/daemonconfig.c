@@ -39,6 +39,7 @@
 
 #include "../ptpd.h"
 #include "../datatypes.h"
+#include "../ptp_datatypes.h"
 
 /*-
  * Helper macros - this is effectively the API for using the new config file interface.
@@ -1026,10 +1027,40 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
                                    PTPD_RESTART_NONE, rtOpts->securityOpts.keyIDString, sizeof(rtOpts->securityOpts.keyIDString), rtOpts->securityOpts.keyIDString,
                                    "4 byte key id value");
 
-    /* key disclosure delay, emulated here as just a boolean so sender knows when a TLV needs to include the disclosed key */
-    parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:disclosure_delay", PTPD_RESTART_NONE,
-                                    &rtOpts->securityOpts.disclosureDelay, rtOpts->securityOpts.disclosureDelay,
-                                    "Emulation of key disclosure delay as boolean to indicate that the disclosed key must be included in the TLV.");
+    /************************** delayed processing configuration settings *****************************************/
+
+    /* For delayed processing, the length of the keychain / number of time intervals */
+    parseResult &= configMapInt(opCode, opArg, dict, target, "security:chain_length", PTPD_RESTART_NONE, INTTYPE_U16,
+                                &rtOpts->securityOpts.chainLength, rtOpts->securityOpts.chainLength,
+                                "For delayed security processing, the length of the keychain / number of time intervals.",
+                                RANGECHECK_RANGE,1,USHRT_MAX);
+
+	/* For delayed processing, the start time of the first time interval in seconds from epoch */
+	parseResult &= configMapInt(opCode, opArg, dict, target, "security:start_time", PTPD_RESTART_NONE, INTTYPE_I32,
+								&rtOpts->securityOpts.startTime.seconds, rtOpts->securityOpts.startTime.seconds,
+								"For delayed security processing, the start time of the first time interval.",
+								RANGECHECK_RANGE,0,INT_MAX);
+
+
+    /* For delayed processing, the length of an interval (s); limits, min 1ms, 1 day max */
+    parseResult &= configMapDouble(opCode, opArg, dict, target, "security:interval_duration", PTPD_RESTART_NONE,
+                                   &rtOpts->securityOpts.intervalDuration, rtOpts->securityOpts.intervalDuration,
+                                   "For delayed security processing, the length of an interval",
+                                   RANGECHECK_RANGE, 0.001, 86400);
+
+    /* For delayed processing, upper bound on network delay */
+    parseResult &= configMapDouble(opCode, opArg, dict, target, "security:D_t", PTPD_RESTART_NONE,
+                                   &rtOpts->securityOpts.D_t, rtOpts->securityOpts.D_t,
+                                   "For delayed security processing, upper bound on network delay",
+                                   RANGECHECK_RANGE, 0, 86400);
+
+    /* For delayed processing, the key disclosure delay in units of time intervals */
+    parseResult &= configMapInt(opCode, opArg, dict, target, "security:disclosure_delay", PTPD_RESTART_NONE, INTTYPE_U8,
+                                &rtOpts->securityOpts.disclosureDelay, rtOpts->securityOpts.disclosureDelay,
+                                "For delayed security processing, the key disclosure delay in units of time intervals.",
+                                RANGECHECK_RANGE,1,UCHAR_MAX);
+
+
 
     /* when security is enabled and in master state, accept and process insecure messages (messages w/out security bit flipped) */
     parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:master_accept_insecure_announce", PTPD_RESTART_NONE,
@@ -2587,10 +2618,66 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
         printf("\n");
     }
 
-    if (rtOpts->securityEnabled) {
-        stringToBinary(rtOpts->securityOpts.keyString, rtOpts->securityOpts.key, MAX_SEC_KEY_LEN);
-        stringToBinary(rtOpts->securityOpts.integrityAlgTypOIDString, rtOpts->securityOpts.integrityAlgTypOID, MAX_OID_LEN);
 
+
+    if (rtOpts->securityEnabled) {
+
+        SecurityOpts *secOpts = &rtOpts->securityOpts;
+
+        /* set the key length based on the inputted key string from the config file */
+        secOpts->keyLen = strlen(secOpts->keyString) / 2;
+
+		/*
+		 * "on any errors, NULL is returned" for this function parseConfig, and ptpdStartup (which calls this)
+		 * will fail; if parseResult is false, NULL will be returned
+		 */
+		if (!(secOpts->key = calloc(1, secOpts->keyLen))) {
+			parseResult = FALSE;
+		} else {
+			/* read the key provided in the config file into memory */
+            stringToBinary(secOpts->keyString, secOpts->key, MAX_SEC_KEY_LEN);
+		}
+
+        /*
+         * if delayed, the key we just read in is the startKey; generate the keychain from it, set the
+         * trustAnchor pointer to the last key in the chain, and reset the key pointer to be the first
+         * usable key in the chain, i.e. K_1 (hashes to K_0, the trust anchor) */
+        if (secOpts->delayed) {
+            if(!(secOpts->keyChain = calloc(secOpts->chainLength + 1, sizeof(unsigned char *)))) {
+                parseResult = FALSE;
+            } else {
+                /* first key in chain is the 'random' start key, read in from config file above */
+                secOpts->keyChain[0] = secOpts->key;
+
+                /* allocate memory for the rest of the keys in the chain */
+                for (int i = 1; i < secOpts->chainLength + 1; i++) {
+                    if (!(secOpts->keyChain[i] = calloc(1, secOpts->keyLen))) {
+                        parseResult = FALSE;
+                        break;
+                    }
+                }
+                /* if any calloc failed above, don't try to generate the keychain */
+                if (parseResult) {
+                    /*
+                     * recursive function, 1st arg is a pointer to a key 'base' upon which n (3rd arg) more keys
+                     * will be based on... hence why it is called here with n = chainLength (even though the keyChain
+                     * array of keys is size chainLength + 1
+                     */
+                    generate_chain(secOpts->keyChain, secOpts->keyLen, secOpts->chainLength);
+                }
+
+                secOpts->key = secOpts->keyChain[secOpts->chainLength - 1];
+                secOpts->trustAnchor = secOpts->keyChain[secOpts->chainLength];
+            }
+
+			/* startTime is timeInternal, only seconds portion got read in; clear nanoseconds */
+			secOpts->startTime.nanoseconds = 0;
+
+        }
+
+		stringToBinary(rtOpts->securityOpts.integrityAlgTypOIDString, rtOpts->securityOpts.integrityAlgTypOID, MAX_OID_LEN);
+
+		/* debugging print */
         if (DM_MSGS) {
             printf("the OID is: \n\t");
             for (int i = 0; i < 20; i++)
@@ -2617,6 +2704,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
             WARNING("The algorithm OID provided does not match; using HMAC as default\n");
         }
 
+		/* debugging print */
         if (DM_MSGS) {
             switch (rtOpts->securityOpts.integrityAlgTyp) {
                 case GMAC_AES256:
@@ -2631,17 +2719,46 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
         rtOpts->securityOpts.SPP =  (UInteger8) strtoul(rtOpts->securityOpts.SPPString, 0, 16); // base 16
         rtOpts->securityOpts.keyID =  (UInteger32) strtoul(rtOpts->securityOpts.keyIDString, 0, 16); // base 16
 
-        /* set the key length based on the inputted key string from the config file */
-        rtOpts->securityOpts.keyLen = strlen(rtOpts->securityOpts.keyString) / 2;
+
     }
 
+	/* debugging prints */
     if (DM_MSGS) {
-        printf("the key is (length: %d):\n\t", rtOpts->securityOpts.keyLen);
-        for (int i = 0; i < 32; i++) {
-            printf("0x%02x ", rtOpts->securityOpts.key[i]);
-        }
-        printf("\nSPP: %02x\nkeyid: %08x\n",
+        if (rtOpts->securityOpts.delayed) {
+			printf("the first key is (length: %d):\n\t", rtOpts->securityOpts.keyLen);
+			for (int i = 0; i < 32; i++) {
+				printf("%02x ", rtOpts->securityOpts.keyChain[0][i]);
+			}
+            printf("\n");
+
+            printf("the key is (length: %d):\n\t", rtOpts->securityOpts.keyLen);
+            for (int i = 0; i < 32; i++) {
+                printf("%02x ", rtOpts->securityOpts.key[i]);
+            }
+            printf("\n");
+
+            printf("the trust anchor is (length: %d):\n\t", rtOpts->securityOpts.keyLen);
+            for (int i = 0; i < 32; i++) {
+                printf("%02x ", rtOpts->securityOpts.trustAnchor[i]);
+            }
+            printf("\n");
+
+		} else {
+			printf("the key is (length: %d):\n\t", rtOpts->securityOpts.keyLen);
+			for (int i = 0; i < 32; i++) {
+				printf("%02x ", rtOpts->securityOpts.key[i]);
+			}
+            printf("\n");
+		}
+
+		printf("SPP: %02x\nkeyid: %08x\n",
                rtOpts->securityOpts.SPP, rtOpts->securityOpts.keyID);
+
+		/* debugging print start time */
+		char tmpBuf[200];
+		memset(tmpBuf, 0, sizeof(tmpBuf));
+		snprint_TimeInternal(tmpBuf, sizeof(tmpBuf), &rtOpts->securityOpts.startTime);
+		printf("startTime (TimeInternal) as string is: %s\n", tmpBuf);
     }
 
 #endif /* PTPD_SECURITY */

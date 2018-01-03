@@ -13,5 +13,6 @@ int dm_GMAC(const unsigned char *key,
             unsigned char *iv, int iv_len,
             unsigned char *data, int data_len,
             unsigned char *icv, int icv_len);
+void generate_chain(unsigned char **base, int key_len, int n);
 
 #endif //PTPD_DM_SECURITY_H

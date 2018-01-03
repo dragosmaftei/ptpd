@@ -55,6 +55,7 @@
  */
 
 #include "../ptpd.h"
+#include "../datatypes.h"
 
 /*
  * valgrind 3.5.0 currently reports no errors (last check: 20110512)
@@ -591,6 +592,11 @@ ptpdShutdown(PtpClock * ptpClock)
 	if(ptpClock->msgTmpHeader.messageType == SIGNALING)
 		freeSignalingTLV(&ptpClock->msgTmp.signaling);
 	freeSignalingTLV(&ptpClock->outgoingSignalingTmp);
+
+#ifdef PTPD_SECURITY
+    INFO("DM: Shutting down, freeing security related memory...\n");
+    freeSecurityOpts(&rtOpts.securityOpts);
+#endif /* PTPD_SECURITY */
 
 #ifdef PTPD_SNMP
 	snmpShutdown();

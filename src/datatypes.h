@@ -249,22 +249,27 @@ typedef struct {
     UInteger8 SPP;
     char SPPString[1 * 2 + 1]; // size of SPP (1 byte) * 2 + 1 for null
 
-    /* supposed to identify the value of the currently used key (if GDOI/immediate) */
+    /*
+     * if immediate/GDOI: supposed to identify the value of the currently used key (how...? unused)
+     * if delayed/TESLA: specifies the time interval (and thus, in a way, the key used to protect) for the current message
+     */
     UInteger32 keyID;
     char keyIDString[4 * 2 + 1]; // size of keyID (4) * 2 + 1 for null
 
 	/* this will be set in daemonconfig.c after reading in the key from the config file */
     UInteger16 keyLen;
 
-    unsigned char key[MAX_SEC_KEY_LEN];
+    /*
+     * if immediate, this is the key, will be mallocd at start up;
+     * if delayed, this is the current key in the keychain; needs to be pointer, not array, so that for delayed,
+     * it can be reassigned as needed to different keys in the keychain
+	 */
+	unsigned char *key;
 	/*
 	 * config file requires key in hex, read in as string initially, so for max key length
 	 * 32 bytes, need 64 chars and +1 for null byte
 	 */
 	char keyString[MAX_SEC_KEY_LEN * 2 + 1];
-
-    /* key disclosure delay, emulated as a boolean so sender knows when to include a disclosed key */
-	Boolean disclosureDelay;
 
     /*
      * disclosedKey (optional), only for delayed
@@ -290,6 +295,78 @@ typedef struct {
 
 	/* immediate or delayed security processing */
 	Boolean delayed;
+
+    /* ==================== delayed/TESLA specific variables ======================= */
+
+    /*
+     * for choosing best values for T_int and d, use these heuristics from RFC4082
+     * let m = 'reasonable upper bound on network delay' (ms)
+     * let n = expected period per packet (ms), so if sending 1 packet per second, then n is 1000 ms
+     *
+     * T_int = max(m, n)
+     *
+     * d = ceil(2m / T_int) + 1
+     */
+
+    /*
+     * T_int: the interval duration (s)
+     * uint16 supports 65536 values, in ms this gives ~1 minute, may not be long enough for some applications
+     * uint32 supports 4294967296 values, in ms this gives us ~49 days; with a minimum disclosure delay of 1 interval,
+     * this means a new key would be disclosed every 49 days... if someone wants to set the interval duration for longer
+     * than this you have other problems to consider
+     */
+	//UInteger32 intervalDuration;
+	double intervalDuration;
+
+    /*
+     * T_0: the start time of interval 0
+     * this is absolute time as Unix timestamp, i.e. seconds since Jan 01 1970
+     * use https://www.unixtimestamp.com/index.php to get desired start time
+     * in the delayed processing operations, to figure out current time interval, this start time will need to be
+     * subtracted from the current time (which gets read into a TimeInternal), so let's store the startTime
+     * in a TimeInternal as well (has Int32 seconds member and Int32 nanoseconds member)
+     * at time of writing, Jan 01 2018, time is 1,514,764,800. uint16 holds 2^16 = 65536, clearly too small
+     * signed int32 holds 2^31 (can't use sign bit) = 2147483648, only holds up to 1/19/2038 (year 2038 problem)
+     * this inputted start time (as seconds held in an int32) will be read into the seconds (Integer32) member
+     * of the TimeInternal structure;
+     */
+    //UInteger32 startTime;
+    TimeInternal startTime;
+
+    /* N: the length of the one-way chain (also, the number of intervals) */
+    UInteger16 chainLength;
+
+    /* d: the disclosure delay (in number of intervals) */
+    UInteger8 disclosureDelay;
+
+    /* D_t: upper bound on 'the lag of receiver's clock w.r.t. sender's' i.e. upper bound on network delay (s)
+     * e.g. if local time is t, then the time at sender is t + D_t
+     */
+    double D_t;
+
+    /*  */
+    unsigned char **keyChain;
+
+    /*
+     * K_N: random value chosen by master (secret) used as the starting point for the key chain (keyChain[0])
+     * provided in the config file as 'key'
+     */
+
+    /*
+     * K_0: the trust anchor in the key chain, i.e. the last key in the chain (keyChain[chainLength - 1])
+     * this would normally be distributed by the master to the slaves as part of a bootstrapping phase, after
+     * the master generates the keychain from the randomly chosen start key
+     * instead of dealing with this distribution issue, everyone (regardless of state) gets the 'random' startKey at
+     * start up, and generates the key chain... we pretend the slaves don't have the entire keychain
+     */
+    unsigned char *trustAnchor;
+
+    //DM:TODO this won't work since rtOpts is const in issue____ functions......
+    /* during delayed processing, based on certain criteria, these will get set appropriately */
+    UInteger16 currentInterval;
+    Boolean discloseKey; /* true if we should disclose a key */
+
+    /* ==================== other variables ======================= */
 
     /* process messages that are not secure i.e. don't have security bit flipped */
 	Boolean masterAcceptInsecureAnnounce;

@@ -1739,9 +1739,11 @@ void msgPackSecurityTLV(SecurityTLV *data, Octet *buf)
 
 /*
  * buf is the output buffer (PTP header start)
+ * Boolean general (as in, message type, as opposed to event) is used for delayed security processing to decide
+ * whether to consider including a disclosed key in this message (should not disclose key in event messages)
  * this should be called after the buffer has been packed (including header) for the type of message
  */
-UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
+UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts, Boolean general)
 {
     /*
      * we've "used policy limiting fields to query the SPD" (i.e. in this emulation, just checked 'securityEnabled'),
@@ -1759,7 +1761,20 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
      */
     UInteger16 secTLVLen = rtOpts->securityOpts.secTLVLen;
 
-    /* DM:TODO determine current time interval,
+    Boolean delayed = rtOpts->securityOpts.delayed;
+
+    /* calculate and set the current time interval */
+    if (delayed) {
+        TimeInternal currentTime;
+        getTime(&currentTime);
+        TimeInternal elapsed;
+        /* result, x - y */
+        subTime(&elapsed, &currentTime, &rtOpts->securityOpts.startTime);
+        //rtOpts->securityOpts.currentInterval = timeInternalToDouble(&elapsed) / rtOpts->securityOpts.intervalDuration;
+    }
+
+
+     /*
      * DM:TODO determine whether to include a disclosed key or not
      * DM:TODO - this requires access to the message type (i.e. re-parameterize this function) since disclosed key should only be in non-event msgs
      * DM:TODO - maybe have a boolean that tracks whether the key has been disclosed yet for a given interval?
@@ -1825,6 +1840,8 @@ UInteger16 addSecurityTLV(Octet *buf, const RunTimeOpts *rtOpts)
     }
 
     //DM:TODO need to use the right key.... secOpts passed in for key, keylength, icvlength...
+    //DM:TODO need to reparameterize calculateAndPackICV and calculateAndVerifyICV to pass a pointer to the key
+    //DM:TODO to use, since we can't change the key pointer for delayed processing since rtOpts is const...
     // could have a few more pointers, keyChain to point to first one, or trustAnchor, and adjust the 'key' pointer as needed
     // as we pass through different time intervals
 
@@ -1854,8 +1871,7 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
     IntegrityAlgTyp algTyp = secOpts->integrityAlgTyp;
 
     switch (algTyp) {
-        case HMAC_SHA256:
-            if (DM_MSGS) INFO("SEND doing HMAC\n");
+        case HMAC_SHA256: {
             /* the result of the ICV calculation will be stored here */
             unsigned char *static_digest;
 
@@ -1872,8 +1888,8 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
             memcpy(buf + icvOffset, static_digest, secOpts->icvLength);
 
             break;
-        case GMAC_AES256:
-            if (DM_MSGS) INFO("SEND doing GMAC\n");
+         }
+        case GMAC_AES256: {
             /* get random bytes for IV */
             unsigned char iv[GMAC_IV_LEN];
             memset(iv, 0, sizeof(iv));
@@ -1898,10 +1914,8 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
             /* pack IV in buffer before ICV so receiver will be able to use same IV to verify ICV */
             memcpy(buf + icvOffset - sizeof(iv), iv, sizeof(iv));
 
-            if (DM_MSGS)
-                INFO("IV[0]: %01x, ICV[0]:%01x\n", iv[0], *(buf + icvOffset));
-
             break;
+         }
         default:
             ERROR("Unknown algTyp in calculateAndPackICV\n");
             break;
@@ -1915,8 +1929,7 @@ Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, U
     IntegrityAlgTyp algTyp = secOpts->integrityAlgTyp;
 
     switch (algTyp) {
-        case HMAC_SHA256:
-            if (DM_MSGS) INFO("REC doing HMAC\n");
+        case HMAC_SHA256: {
 
             unsigned char *static_digest;
 
@@ -1937,8 +1950,8 @@ Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, U
                 return FALSE;
             }
             break;
+        }
         case GMAC_AES256: {
-            if (DM_MSGS) INFO("REC doing GMAC\n");
             /* create local buffer to store calculated icv */
             unsigned char localICV[secOpts->icvLength];
             memset(localICV, 0, sizeof(localICV));
@@ -1964,6 +1977,26 @@ Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, U
             return FALSE;
     }
     return TRUE;
+}
+
+void
+freeSecurityOpts(SecurityOpts *secOpts)
+{
+    /* delayed processing requires freeing multiple things */
+    if (secOpts->delayed) {
+        /* DM:TODO free the key / keychain */
+        INFO("DM: delayed... freeing the keychain...\n");
+
+        /* DM:TODO free the message buffers */
+        INFO("DM: delayed... freeing the message buffers...\n");
+    }
+    /* immediate processing, only thing to free should be the key */
+    else {
+        if (secOpts->key) {
+            INFO("DM: freeing the key...\n");
+            free(secOpts->key);
+        }
+    }
 }
 
 #endif /* PTPD_SECURITY */
