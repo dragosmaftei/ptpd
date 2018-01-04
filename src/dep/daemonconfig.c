@@ -1049,7 +1049,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
                                    RANGECHECK_RANGE, 0.001, 86400);
 
     /* For delayed processing, upper bound on network delay */
-    parseResult &= configMapDouble(opCode, opArg, dict, target, "security:D_t", PTPD_RESTART_NONE,
+    parseResult &= configMapDouble(opCode, opArg, dict, target, "security:d_t", PTPD_RESTART_NONE,
                                    &rtOpts->securityOpts.D_t, rtOpts->securityOpts.D_t,
                                    "For delayed security processing, upper bound on network delay",
                                    RANGECHECK_RANGE, 0, 86400);

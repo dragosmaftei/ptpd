@@ -1366,6 +1366,7 @@ Boolean isSafePacket(TimeInternal *recvTime, UInteger32 i, SecurityOpts *secOpts
 	 */
 	UInteger16 x = (t_j - T_0) / secOpts->intervalDuration;
 
+    INFO("DM: safe packet test x < i + d: %d < %d + %d\n", x, i, secOpts->disclosureDelay);
 	/*
 	 * verify that x < i + d (where i is the interval index), which implies that the sender is not yet in the
 	 * interval during which it discloses the key K_i.
@@ -1427,6 +1428,10 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
      * 'securityEnabled' emulates getting the policy limiting fields from the PTP header and querying the SPD to
      * answer the question 'do we want security processing on this packet?' if yes, the query would return an SPP
      * which would be used to query the SAD to get the relevant SA, which contains necessary security parameters
+     *
+     * DM:TODO does master doing delayed need to ignore this whole block to avoid processing msgs from self?
+     * if doing delayed and master, should not be receiving any secured messages, so skip this... this is an ugly
+     * work around; an SPD query should give this information. this is to avoid doing processing msgs from self...
      */
     if (rtOpts->securityEnabled) {
 		/* get securityOpts into a local pointer to simplify */
