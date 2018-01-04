@@ -1773,11 +1773,19 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
         TimeInternal elapsed;
         /* result, x - y */
         subTime(&elapsed, &currentTime, &secOpts->startTime);
+
+        /* if elapsed time is negative, we haven't reached the startTime yet, so just return 0, and no TLV is added */
+        if (isTimeInternalNegative(&elapsed)) {
+            return 0;
+        }
+
         /* implicit cast here is fine, we want the remainder to be dropped */
         currentInterval = timeInternalToDouble(&elapsed) / secOpts->intervalDuration;
 
-        /* DM:TODO verify this wraparound works... for test implementation only... when keychain is exhausted,
-         * new keychain should be created */
+        /*
+         * NOTE: this wraparound is for test implementation only... when keychain is exhausted, a new keychain
+         * should be created (not a problem) AND the trust anchor distributed (problem... and out of scope)
+         */
         currentInterval = currentInterval % secOpts->chainLength;
 
         discKeyInterval = currentInterval - secOpts->disclosureDelay;
@@ -1830,9 +1838,9 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
 
     /* pack the disclosed key if necessary */
     if (discloseKey) {
-        // DM:TODO get key from interval = curInterval - disclosureDelay
-        // DM:TODO this disclosed key is right from the keychain, NOT the generated ICV key
+        /* the keys in the keychain correspond to time intervals in reverse order, i.e. keychain[0] = last interval */
         int discKeyIndex = secOpts->chainLength - 1 - discKeyInterval;
+        /* this disclosed key is right from the keychain, NOT the generated ICV key */
         unsigned char *disclosedKey = secOpts->keyChain[discKeyIndex];
 
         /* DM:TODO debug printing the disclosed key*/
@@ -1842,11 +1850,10 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
         tmpBuf[secOpts->keyLen] = '\0';
         INFO("DM: currentInterval: %d, disclosing keyChain[%d] from interval %d: %02x...%02x\n",
              currentInterval, discKeyIndex, discKeyInterval, tmpBuf[0], tmpBuf[secOpts->keyLen - 1]);
+        /* DM:TODO end debug printing the disclosed key */
 
         /* add disclosed key at 10th byte offset... just 0xdds for testing */
         memcpy(buf + msg_len + SEC_TLV_CONSTANT_LEN, disclosedKey, secOpts->keyLen);
-
-        //memset(buf + msg_len + SEC_TLV_CONSTANT_LEN, 0xdd, secOpts->keyLen);
     }
 
     /*
