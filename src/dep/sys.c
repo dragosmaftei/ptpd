@@ -1377,6 +1377,17 @@ else {
 			(unsigned long)ptpClock->counters.keyIDMismatchErrors);
 	fprintf(out, 		STATUSPREFIX"  %lu\n","icvMismatchErrors",
 			(unsigned long)ptpClock->counters.icvMismatchErrors);
+
+	/* delayed processing counters */
+	fprintf(out, 		STATUSPREFIX"  %lu\n","safePackets",
+			(unsigned long)ptpClock->counters.safePackets);
+	fprintf(out, 		STATUSPREFIX"  %lu\n","unsafePackets",
+			(unsigned long)ptpClock->counters.unsafePackets);
+	fprintf(out, 		STATUSPREFIX"  %lu\n","keyVerificationSuccesses",
+			(unsigned long)ptpClock->counters.keyVerificationSuccesses);
+	fprintf(out, 		STATUSPREFIX"  %lu\n","keyVerificationFails",
+			(unsigned long)ptpClock->counters.keyVerificationFails);
+
 #endif /* PTPD_SECURITY */
 
 	fflush(out);

@@ -92,6 +92,13 @@ typedef struct
 	uint32_t SPPMismatchErrors; /* SPP from incoming message's TLV didn't match SPP from SPD query */
     uint32_t keyIDMismatchErrors; /* keyID from incoming message's TLV didn't match keyID from our "SA" */
     uint32_t icvMismatchErrors; /* failed icv verification; icvs didn't match */
+
+    /* delayed processing counters, TODO only added to writeStatusFile atm */
+    uint32_t safePackets;
+    uint32_t unsafePackets;
+    uint32_t keyVerificationSuccesses;
+    uint32_t keyVerificationFails;
+
 #endif /* PTPD_SECURITY */
 
 	/* unicast sgnaling counters */
@@ -262,7 +269,7 @@ typedef struct {
     /*
      * if immediate, this is the key, will be mallocd at start up;
      * if delayed, this is the current key in the keychain; needs to be pointer, not array, so that for delayed,
-     * it can be reassigned as needed to different keys in the keychain
+     * it can be reassigned as needed to different keys in the keychain TODO not true, shouldn't reassign anyway, const rtOpts
 	 */
 	unsigned char *key;
 	/*

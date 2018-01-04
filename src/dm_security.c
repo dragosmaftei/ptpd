@@ -12,7 +12,7 @@ void generate_chain(unsigned char **base, int key_len, int n) {
     if (n == 0)
         return;
 
-    /* hash over 0 to generate key chain */
+    /* hash over 0 to generate key chain, RFC 4082 section 3.2 */
     unsigned char message = 0;
     int message_len = 1;
 
@@ -27,6 +27,23 @@ void generate_chain(unsigned char **base, int key_len, int n) {
 
     /* next call uses newly generated key as a base */
     generate_chain(base + 1, key_len, n - 1);
+}
+
+/*
+ * given a key (from a keychain), generate a corresponding ICV key by hashing over 1 (RFC 4082 section 3.4)
+ */
+void generate_icv_key(unsigned char *result, unsigned char *key, int key_len) {
+    unsigned char message = 1;
+    int message_len = 1;
+
+    /*
+     * hash over message 1 using provided key, storing the result (the corresponding ICV key) in result
+     * last argument is int * where the length of the result is placed, unless it is null (don't need it)
+     */
+    HMAC(EVP_sha256(),
+         (void *)key, key_len,
+         &message, message_len,
+         result, 0);
 }
 
 /*

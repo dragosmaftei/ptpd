@@ -1237,7 +1237,13 @@ timestampCorrection(const RunTimeOpts * rtOpts, PtpClock *ptpClock, TimeInternal
 
 }
 
-#if defined(PTPD_SECURITY) && defined(RUNTIME_DEBUG)
+#if DEFINE_SECURITY
+#define PTPD_SECURITY
+#endif /* DEFINE_SECURITY */
+
+
+#ifdef PTPD_SECURITY
+#ifdef RUNTIME_DEBUG
 /* function to facilitate measuring how long security processing takes */
 void
 recordTimingMeasurement(PtpClock *ptpClock, Enumeration4Lower type, Boolean recv,
@@ -1342,7 +1348,34 @@ recordTimingMeasurement(PtpClock *ptpClock, Enumeration4Lower type, Boolean recv
 		(*numMeasurements)++;
 	}
 }
+#endif /* RUNTIME_DEBUG */
+
+/*
+ * determine whether the received packet is safe (RFC 4082 section 3.5.1)
+ * a safe packet is one whose ICV is based on a safe key
+ * a safe key is one that hasn't been disclosed yet
+ */
+Boolean isSafePacket(TimeInternal *recvTime, UInteger32 i, SecurityOpts *secOpts) {
+	/* compute upper bound t_j on the sender's clock at the time when the packet arrived: t_j = T + D_t */
+	double t_j = timeInternalToDouble(recvTime) + secOpts->D_t;
+	double T_0 = timeInternalToDouble(&secOpts->startTime);
+
+	/*
+	 * compute the highest interval x the sender could possibly be in: x = floor((t_j - T_0) / T_int)
+	 * implicit cast from double to int is fine as we want round down
+	 */
+	UInteger16 x = (t_j - T_0) / secOpts->intervalDuration;
+
+	/*
+	 * verify that x < i + d (where i is the interval index), which implies that the sender is not yet in the
+	 * interval during which it discloses the key K_i.
+	 */
+	return (x < i + secOpts->disclosureDelay) ? TRUE : FALSE;
+}
+
 #endif /* PTPD_SECURITY */
+
+
 
 void
 processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp, ssize_t length)
@@ -1379,9 +1412,6 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
     msgUnpackHeader(ptpClock->msgIbuf, &ptpClock->msgTmpHeader);
 
-#if DEFINE_SECURITY
-#define PTPD_SECURITY
-#endif /* DEFINE_SECURITY */
 
 #ifdef PTPD_SECURITY
 
@@ -1543,16 +1573,47 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			/* for immediate, just use the one key */
 			unsigned char *key = secOpts->key;
 
-			/* delayed processing case */
+			/* DM:TODO delayed processing case */
 			if (secOpts->delayed) {
-				//DM:TODO delayed receive processing... interval calc, safe packet test, key verification, buffers...
-				/* - figure out current time interval */
-				/* - if disclosed key, verify it is OK... figure out what time interval it corresponds to, and
-				 * use it to verify all the messages in that bucket
-				 * -- if all messages are good, become not paranoid
-				 * -- if any message failed, become paranoid
-				 * - if i'm not paranoid, store the message in the bucket
-				 * - if i'm paranoid, store the message but return (don't sync with this message)
+				/*
+				 * safe packet test
+				 * - record the result in safePacket / unsafePacket counters
+				 * - if safe, buffer the message; if unsafe, return?
+				 * need to pass timeStamp, packet interval (keyID field), discDelay, D_t, T_0, T_int (secOpts)
+				 */
+				if (isSafePacket(timeStamp, sec_tlv.keyID, secOpts)) {
+                    ptpClock->counters.safePackets++;
+                    //DM:TODO buffer packet
+
+				} else {
+                    ptpClock->counters.unsafePackets++;
+                    if (DM_MSGS)
+                        INFO("DM: unsafe packet seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+                    return;
+                }
+
+				/*
+				 * new key index test
+				 * - if there's a disclosed key, check if it's new
+				 * -- if it's not new, then we already have that key, and already verified its corresponding messages
+				 * -- if it's new, verify the key
+				 */
+
+				/*
+				 * key verification for a new key
+				 * - if key verification fails, discard this packet
+				 * - if key is good, use it to verify buffered messages
+				 */
+
+				/*
+				 * verify buffered messages
+				 * - if all are good, become not paranoid
+				 * - if x of them are bad, become paranoid
+				 */
+
+				/*
+				 * if i'm not paranoid, store the message in the bucket
+				 * if i'm paranoid, store the message but return (don't sync with this message)
 				 */
 
 

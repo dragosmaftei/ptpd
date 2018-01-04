@@ -1738,9 +1738,9 @@ void msgPackSecurityTLV(SecurityTLV *data, Octet *buf)
 }
 
 /*
- * buf is the output buffer (PTP header start)
- * Boolean general (as in, message type, as opposed to event) is used for delayed security processing to decide
- * whether to consider including a disclosed key in this message (should not disclose key in event messages)
+ * - buf is the output buffer (PTP header start)
+ * - Boolean msgClassGeneral (as in, message type, as opposed to event) is used for delayed security processing to
+ * decide whether to consider including a disclosed key in this message (should not disclose key in event messages)
  * this should be called after the buffer has been packed (including header) for the type of message
  */
 UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgClassGeneral)
@@ -1873,9 +1873,17 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
     /* for immediate, just use the one key */
     unsigned char *key = secOpts->key;
 
+    // DM:TODO verify this works
     if (secOpts->delayed) {
-        // DM:TODO need function to generate ICV key from keychain key
+        unsigned char ICVKey[MAX_SEC_KEY_LEN];
+        memset(ICVKey, 0, MAX_SEC_KEY_LEN);
 
+        int keyIndex = secOpts->chainLength - 1 - currentInterval;
+
+        /* generate icv key using keychain key, hashing over 1; result is placed in 1st arg */
+        generate_icv_key(ICVKey, secOpts->keyChain[keyIndex], secOpts->keyLen);
+
+        key = ICVKey;
     }
 
     /* passing in security parameters, buffer (start of PTP header), ICV offset, and the key */
