@@ -1783,12 +1783,19 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
         currentInterval = timeInternalToDouble(&elapsed) / secOpts->intervalDuration;
 
         /*
+         * calculate discKeyInterval here, so that it is only negative for the first disclosureDelay intervals,
+         * after which, if currentInterval wraps around, the first disclosureDelay intervals of wrap around, the
+         * corresponding discKeyInterval will be the last disclosureDelay intervals
+         */
+        discKeyInterval = currentInterval - secOpts->disclosureDelay;
+
+        /*
          * NOTE: this wraparound is for test implementation only... when keychain is exhausted, a new keychain
          * should be created (not a problem) AND the trust anchor distributed (problem... and out of scope)
          */
         currentInterval = currentInterval % secOpts->chainLength;
+        discKeyInterval = discKeyInterval % secOpts->chainLength;
 
-        discKeyInterval = currentInterval - secOpts->disclosureDelay;
         /* disclose a key for messages from a previous interval only if:
          * - this is a general message (non-event message), AND
          * - we're not currently in the first <disclosureDelay> intervals (i.e. if disclosureDelay is 2, we can't

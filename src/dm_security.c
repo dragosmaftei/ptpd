@@ -2,8 +2,41 @@
 // Created by iol on 5/19/17.
 //
 
+#include "dm_security.h"
+#include <string.h>
 #include <openssl/hmac.h> /* includes HMAC and EVP_sha256() */
 //#include <openssl/evp.h> /* this has EVP_sha256() only */
+
+/*
+ * verifies a newly passed in key, returns non zero if the key passes verification, and stores the newly verified key
+ * (as well as any intermediate keys between the new one and the latest verified key) in the verified_keys chain (due to
+ * the call to generate_chain); in the calling function, latestInterval will be updated to reflect the presence of the new keys
+ * returns 0 if the key fails verification; the verified_keys chain will still have the bad keys stored, but they are
+ * effectively garbage since the latestInterval variable will not be updated in the calling function
+ */
+int verify_key(unsigned char **verified_keys, unsigned char *new_key, int new_interval, int latest_interval,
+                int chain_len, int key_len) {
+    /* translate intervals into keyChain indices since keychains are laid out in reverse order */
+    int new_index = chain_len - new_interval - 1;
+    int latest_index = chain_len - latest_interval - 1;
+
+    /* copy new key into proper slot in verified keys */
+    memcpy(verified_keys[new_index], new_key, key_len);
+
+    /* generateChain from new key as base, up to but not including the key at the latest interval (the lastest verified key) */
+    generate_chain(&verified_keys[new_index], key_len, new_interval - latest_interval - 1);
+
+    /* hash the newly generated 2nd from latest key; it should hash to the latest key (which is already verified) */
+    unsigned char tmpbuf[EVP_MAX_MD_SIZE];
+
+    unsigned char message = 0;
+    int message_len = 1;
+    HMAC(EVP_sha256(), (void *)verified_keys[latest_index - 1], key_len, &message, message_len, tmpbuf, 0);
+
+    /* memcmp returns 0 if identical */
+    return !memcmp(tmpbuf, verified_keys[latest_index], key_len);
+
+}
 
 /*
  * base points to a key upon which n more keys will be based

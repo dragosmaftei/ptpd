@@ -240,6 +240,24 @@ typedef enum IntegrityAlgTyp {
 } IntegrityAlgTyp;
 
 /*
+ * for delayed security processing, we need to buffer messages for later verification
+ * a BufferedMsg is a linked list style node that holds a PTP message
+ */
+typedef struct BufferedMsg {
+	char *msg;
+	struct BufferedMsg *next;
+} BufferedMsg;
+
+/*
+ * a Buffer is a linked list of BufferedMsgs representing all buffered messages for a given time interval
+ */
+typedef struct Buffer {
+	BufferedMsg *head;
+	BufferedMsg *tail;
+	int size;
+} Buffer;
+
+/*
  * SecurityOpts struct holds security parameters that - in a future implementation that integrates with a key mgmt
  * scheme - would be provided by a security association (SA). In the current emulation, these security parameters are
  * simply read in from a .conf configuration file (see /dep/daemonconfig.c). Parameters that are read in as hex strings
@@ -382,6 +400,24 @@ typedef struct {
     /* ignore correction field in ICV calculation if using immediate (GDOI) */
     Boolean immIgnoreCorrection;
 } SecurityOpts;
+
+/*
+ * dataset for security variables
+ */
+typedef struct {
+	/*************** delayed processing data ****************************/
+	/* keychain for verified keys for use by slave in delayed processing */
+	unsigned char **verifiedKeys;
+	/* specifies the latest interval for which a slave has a verified key */
+	Integer16 latestInterval;
+
+	/* list of Buffers, one for each time interval; a Buffer holds any number of BufferedMsgs */
+	Buffer **buffers;
+
+	/*  */
+	Boolean paranoid;
+
+} SecurityDS;
 #endif /* PTPD_SECURITY */
 
 /**
@@ -928,9 +964,13 @@ typedef struct {
 
 	RunTimeOpts *rtOpts;
 
-#if defined(PTPD_SECURITY) && defined(RUNTIME_DEBUG)
+#ifdef PTPD_SECURITY
+    /* dataset for security processing */
+    SecurityDS securityDS;
+#ifdef RUNTIME_DEBUG
     SecurityTiming securityTiming;
-#endif /* PTPD_SECURITY & RUNTIME_DEBUG */
+#endif /* RUNTIME_DEBUG */
+#endif /* PTPD_SECURITY */
 
 } PtpClock;
 

@@ -892,7 +892,6 @@ configcheck:
 			usleep(1);
 		}
 	}
-
 	/* Second lock check, to replace the contents with our own new PID and re-acquire the advisory lock */
 	if(!rtOpts->nonDaemon && !rtOpts->ignore_daemon_lock){
 		/* check and create Lock */
@@ -923,6 +922,39 @@ configcheck:
 	}
 
 	ptpClock->rtOpts = rtOpts;
+
+#ifdef PTPD_SECURITY
+    /*
+     * now that we have rtOpts, we can initialize the security dataset
+     * for delayed processing: buffers, verifiedKeys chain, etc..., based on number of intervals
+     */
+	//DM:TODO should this dataset init be factored into a separate function? where should the function live? its prototype?
+	SecurityDS *secDS = &ptpClock->securityDS;
+	SecurityOpts *secOpts = &rtOpts->securityOpts;
+
+	secDS->latestInterval = -1;
+
+	/* allocate memory for the key pointers in the verified keys chain */
+	if (!(secDS->verifiedKeys = calloc(secOpts->chainLength + 1, sizeof(unsigned char *)))) {
+		/* DM:TODO what to do if calloc fails here? */
+	}
+	else {
+		//DM:TODO should we allocate EVP_MAX_MD_SIZE for keys, isntead of keyLen? have wrapper function for this?
+		/* allocate memory for all the keys in the chain */
+		for (i = 0; i < secOpts->chainLength + 1; i++) {
+			if (!(secDS->verifiedKeys[i] = calloc(1, secOpts->keyLen))) {
+				/* DM:TODO what to do fi calloc fails here? */
+				break;
+			}
+		}
+
+		/* copy the trust anchor, i.e. the only 'verified key' we have at the beginning, into last slot */
+		memcpy(secDS->verifiedKeys[secOpts->chainLength], secOpts->trustAnchor, secOpts->keyLen);
+	}
+
+
+
+#endif /* PTPD_SECURITY */
 
 	/* init alarms */
 	initAlarms(ptpClock->alarms, ALRM_MAX, (void*)ptpClock);

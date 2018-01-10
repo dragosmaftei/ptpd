@@ -1599,8 +1599,9 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
 				} else {
                     ptpClock->counters.unsafePackets++;
-                    if (DM_MSGS)
-                        INFO("DM: unsafe packet seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+					if (DM_MSGS)
+						INFO("DM: unsafe packet seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+                    //TODO correciton field won't get restored, but that might not even be necessary?
                     return;
                 }
 
@@ -1608,20 +1609,48 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				 * new key index test
 				 * - if there's a disclosed key, check if it's new
 				 * -- if it's not new, then we already have that key, and already verified its corresponding messages
+				 * --- for wraparound, there may be new messages w/ this key that's already been verified, use it to verify
+				 * --- buffered messages
 				 * -- if it's new, verify the key
 				 */
+				if ((sec_tlv.secParamIndicator & SPI_DISCLOSED_KEY) == SPI_DISCLOSED_KEY) {
+					Integer16 discKeyInterval = sec_tlv.keyID - secOpts->disclosureDelay;
 
-				/*
-				 * key verification for a new key
-				 * - if key verification fails, discard this packet
-				 * - if key is good, use it to verify buffered messages
-				 */
+					/* the disclosed key is new, so verify it */
+					if (ptpClock->securityDS.latestInterval < discKeyInterval) {
+						/*
+				 		 * key verification for a new key
+				 		 * - if key verification fails, discard this packet
+				 		 * - if key is good, use it to verify buffered messages
+				 		 */
 
-				/*
-				 * verify buffered messages
-				 * - if all are good, become not paranoid
-				 * - if x of them are bad, become paranoid
-				 */
+						/* disclosed key is at TLV offset 10 */
+						unsigned char *discKey = (unsigned char *)ptpClock->msgIbuf + packetLength + 10;
+
+						/* pass verifiedKeys, new key, latest index, new index, keychain len, key len */
+						if (verify_key(ptpClock->securityDS.verifiedKeys, discKey,
+								   discKeyInterval, ptpClock->securityDS.latestInterval,
+								   secOpts->chainLength, secOpts->keyLen)) {
+							/* new key has been verified and added to the verified keys; update latest interval */
+							ptpClock->securityDS.latestInterval = discKeyInterval;
+
+							ptpClock->counters.keyVerificationSuccesses++;
+
+							/*
+				 			 * verify buffered messages
+				 			 * - if all are good, become not paranoid
+				 			 * - if x of them are bad, become paranoid
+				 			 */
+						}
+						/* disclosed key failed verification; discard this packet (TODO hasn't it been buffered already?) */
+						else {
+							ptpClock->counters.keyVerificationFails++;
+							if (DM_MSGS)
+								INFO("DM: keyverification failed seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+							return;
+						}
+					}
+				}
 
 				/*
 				 * if i'm not paranoid, store the message in the bucket

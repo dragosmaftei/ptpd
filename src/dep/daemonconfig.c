@@ -2648,6 +2648,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
                 /* first key in chain is the 'random' start key, read in from config file above */
                 secOpts->keyChain[0] = secOpts->key;
 
+				//DM:TODO should we allocate EVP_MAX_MD_SIZE for keys, isntead of keyLen? have wrapper function for this?
                 /* allocate memory for the rest of the keys in the chain */
                 for (int i = 1; i < secOpts->chainLength + 1; i++) {
                     if (!(secOpts->keyChain[i] = calloc(1, secOpts->keyLen))) {
