@@ -1436,11 +1436,12 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
      * answer the question 'do we want security processing on this packet?' if yes, the query would return an SPP
      * which would be used to query the SAD to get the relevant SA, which contains necessary security parameters
      *
-     * DM:TODO does master doing delayed need to ignore this whole block to avoid processing msgs from self?
+     * DM:master doing delayed will ignore this whole block to avoid processing msgs from self
      * if doing delayed and master, should not be receiving any secured messages, so skip this... this is an ugly
      * work around; an SPD query should give this information. this is to avoid doing processing msgs from self...
      */
-    if (rtOpts->securityEnabled) {
+    if (rtOpts->securityEnabled &&
+            !(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_MASTER)) {
 		/* get securityOpts into a local pointer to simplify */
 		SecurityOpts *secOpts = &rtOpts->securityOpts;
 
@@ -1635,6 +1636,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 							/* new key has been verified and added to the verified keys; update latest interval */
 							ptpClock->securityDS.latestInterval = discKeyInterval;
 
+                            if (DM_MSGS)
+                                INFO("DM: verified key %02x (interval: %d)\n", discKey[0], discKeyInterval);
 							ptpClock->counters.keyVerificationSuccesses++;
 
 							/*
@@ -1647,7 +1650,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 						else {
 							ptpClock->counters.keyVerificationFails++;
 							if (DM_MSGS)
-								INFO("DM: keyverification failed seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+                                INFO("DM: keyver failed on key %02x (interval: %d)\n", discKey[0], discKeyInterval);
 							return;
 						}
 					}
