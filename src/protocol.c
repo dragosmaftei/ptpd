@@ -1600,7 +1600,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				} else {
                     ptpClock->counters.unsafePackets++;
 					if (DM_MSGS)
-						INFO("DM: unsafe packet seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+						INFO("DM: unsafe packet seqid %04x from %02x\n", ptpClock->msgTmpHeader.sequenceId,
+                        ptpClock->msgTmpHeader.sourcePortIdentity.clockIdentity[0]);
                     //TODO correciton field won't get restored, but that might not even be necessary?
                     return;
                 }

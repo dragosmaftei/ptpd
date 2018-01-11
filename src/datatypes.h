@@ -346,7 +346,7 @@ typedef struct {
     /*
      * T_0: the start time of interval 0
      * this is absolute time as Unix timestamp, i.e. seconds since Jan 01 1970
-     * use https://www.unixtimestamp.com/index.php to get desired start time
+     * use https://www.epochconverter.com/ (or https://www.unixtimestamp.com/index.php) to get desired start time
      * in the delayed processing operations, to figure out current time interval, this start time will need to be
      * subtracted from the current time (which gets read into a TimeInternal), so let's store the startTime
      * in a TimeInternal as well (has Int32 seconds member and Int32 nanoseconds member)
