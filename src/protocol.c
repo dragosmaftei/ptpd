@@ -1366,13 +1366,6 @@ Boolean isSafePacket(TimeInternal *recvTime, UInteger32 i, SecurityOpts *secOpts
 	 */
 	UInteger16 x = (t_j - T_0) / secOpts->intervalDuration;
 
-    /*
-     * NOTE: this wraparound is for test implementation only... when keychain is exhausted, a new keychain
-     * should be created (not a problem) AND the trust anchor distributed (problem... and out of scope)
-     * as it is, when keychain is exhausted, master wraps around, therefore must do the same here
-     */
-    x = x % secOpts->chainLength;
-
     INFO("DM: safe packet test x < i + d: %d < %d + %d\n", x, i, secOpts->disclosureDelay);
 	/*
 	 * verify that x < i + d (where i is the interval index), which implies that the sender is not yet in the
@@ -1611,12 +1604,15 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				 * new key index test
 				 * - if there's a disclosed key, check if it's new
 				 * -- if it's not new, then we already have that key, and already verified its corresponding messages
-				 * --- for wraparound, there may be new messages w/ this key that's already been verified, use it to verify
-				 * --- buffered messages
 				 * -- if it's new, verify the key
 				 */
 				if ((sec_tlv.secParamIndicator & SPI_DISCLOSED_KEY) == SPI_DISCLOSED_KEY) {
 					Integer16 discKeyInterval = sec_tlv.keyID - secOpts->disclosureDelay;
+
+					//DM:TODO debug
+					if (DM_MSGS)
+						INFO("DM: checking if new key interval %d is new (is latestInterval %d < %d?)\n",
+							 discKeyInterval, ptpClock->securityDS.latestInterval, discKeyInterval);
 
 					/* the disclosed key is new, so verify it */
 					if (ptpClock->securityDS.latestInterval < discKeyInterval) {

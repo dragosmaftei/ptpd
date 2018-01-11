@@ -1781,20 +1781,17 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
 
         /* implicit cast here is fine, we want the remainder to be dropped */
         currentInterval = timeInternalToDouble(&elapsed) / secOpts->intervalDuration;
-
-        /*
-         * calculate discKeyInterval here, so that it is only negative for the first disclosureDelay intervals,
-         * after which, if currentInterval wraps around, the first disclosureDelay intervals of wrap around, the
-         * corresponding discKeyInterval will be the last disclosureDelay intervals
-         */
         discKeyInterval = currentInterval - secOpts->disclosureDelay;
 
-        /*
-         * NOTE: this wraparound is for test implementation only... when keychain is exhausted, a new keychain
-         * should be created (not a problem) AND the trust anchor distributed (problem... and out of scope)
-         */
-        currentInterval = currentInterval % secOpts->chainLength;
-        discKeyInterval = discKeyInterval % secOpts->chainLength;
+        //DM:TODO how to disclose the last <disclosureDelay> keys?
+
+        /* if exhausted the keychain, return 0, don't add TLV anymore */
+        if (currentInterval >= secOpts->chainLength) {
+            if (DM_MSGS)
+                INFO("DM: outside time period (interval %d), not adding TLV\n", currentInterval);
+            return 0;
+        }
+
 
         /* disclose a key for messages from a previous interval only if:
          * - this is a general message (non-event message), AND
@@ -1859,7 +1856,7 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
              currentInterval, discKeyIndex, discKeyInterval, tmpBuf[0], tmpBuf[secOpts->keyLen - 1]);
         /* DM:TODO end debug printing the disclosed key */
 
-        /* add disclosed key at 10th byte offset... just 0xdds for testing */
+        /* add disclosed key at 10th byte offset */
         memcpy(buf + msg_len + SEC_TLV_CONSTANT_LEN, disclosedKey, secOpts->keyLen);
     }
 
