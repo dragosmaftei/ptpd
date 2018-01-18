@@ -1366,7 +1366,8 @@ Boolean isSafePacket(TimeInternal *recvTime, UInteger32 i, SecurityOpts *secOpts
 	 */
 	UInteger16 x = (t_j - T_0) / secOpts->intervalDuration;
 
-    INFO("DM: safe packet test x < i + d: %d < %d + %d\n", x, i, secOpts->disclosureDelay);
+    //DM:TODO remove debug
+    //INFO("DM: safe packet test x < i + d: %d < %d + %d\n", x, i, secOpts->disclosureDelay);
 	/*
 	 * verify that x < i + d (where i is the interval index), which implies that the sender is not yet in the
 	 * interval during which it discloses the key K_i.

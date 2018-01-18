@@ -125,18 +125,7 @@ void dumpBufferedMsg(BufferedMsg *bm) {
             break;
     }
 
-    UInteger16 icvOffset = packetLength + SEC_TLV_CONSTANT_LEN;
-    UInteger16 keyLength = 32; /* hardcoding this in for debugging... */
-
-    PtpClock *unused = 0;
-    SecurityTLV sec_tlv;
-    msgUnpackSecurityTLV(bm->msg + packetLength, &sec_tlv, unused);
-
-    if ((sec_tlv.secParamIndicator & SPI_DISCLOSED_KEY) == SPI_DISCLOSED_KEY) {
-        icvOffset += keyLength;
-    }
-
-    char firstICVByte = bm->msg[icvOffset];
+    char firstICVByte = bm->msg[header.messageLength - GMAC_ICV_LEN]; // debugging.. but GMAC and HMAC have same ICV len
     char lastICVByte = bm->msg[header.messageLength - 1];
 
 
