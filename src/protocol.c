@@ -1589,9 +1589,56 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				 */
 				if (isSafePacket(timeStamp, sec_tlv.keyID, secOpts)) {
                     ptpClock->counters.safePackets++;
-                    //DM:TODO buffer packet
+                    //DM:TODO buffer here or later?
+                    //DM: TODO buffer with correction field present or zeroed out?
+                    /*
+                     * buffer message into the buffer corresponding to the current interval
+                     * pass packet length including the security TLV; packetlength + sectlvlength, or packetlength from header?
+                     */
+                    //DM: TODO check bufferMessage for failure - fails if memoryallocation fails
+                    bufferMessage(ptpClock->securityDS.buffers[sec_tlv.keyID], ptpClock->msgIbuf,
+                                  ptpClock->msgTmpHeader.messageLength);
 
-				} else {
+                    /********************************* debuf info ****************************************/
+                    /* debug info, buffering into buffer x, message type, seqid, icv first and last bytes */
+                    char messageTypeString[25];
+
+                    switch (ptpClock->msgTmpHeader.messageType) {
+                        case ANNOUNCE:
+                            strcpy(messageTypeString, "announce");
+                            break;
+                        case SYNC:
+                            strcpy(messageTypeString, "sync");
+                            break;
+                        case FOLLOW_UP:
+                            strcpy(messageTypeString, "followup");
+                            break;
+                        case PDELAY_REQ:
+                            strcpy(messageTypeString, "pd_req");
+                            break;
+                        case PDELAY_RESP:
+                            strcpy(messageTypeString, "pd_resp");
+                            break;
+                        case PDELAY_RESP_FOLLOW_UP:
+                            strcpy(messageTypeString, "pd_respfollowup");
+                            break;
+                        default:
+                            strcpy(messageTypeString, "unknown message type");
+                            break;
+                    }
+
+                    char firstICVByte = ptpClock->msgIbuf[packetLength + secTLVLen - secOpts->icvLength];
+                    char lastICVByte = ptpClock->msgIbuf[packetLength + secTLVLen - 1];
+
+                    INFO("buffering msg into buff %d, type: %s (seqid %04x) w/ ICV: %02x...%02x\n",
+                         sec_tlv.keyID, messageTypeString, ptpClock->msgTmpHeader.sequenceId,
+                         firstICVByte, lastICVByte);
+
+
+                    /********************************* end debug info ****************************************/
+
+
+                } else {
                     ptpClock->counters.unsafePackets++;
 					if (DM_MSGS)
 						INFO("DM: unsafe packet seqid %04x from %02x\n", ptpClock->msgTmpHeader.sequenceId,
@@ -1608,11 +1655,6 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				 */
 				if ((sec_tlv.secParamIndicator & SPI_DISCLOSED_KEY) == SPI_DISCLOSED_KEY) {
 					Integer16 discKeyInterval = sec_tlv.keyID - secOpts->disclosureDelay;
-
-					//DM:TODO debug
-					if (DM_MSGS)
-						INFO("DM: checking if new key interval %d is new (is latestInterval %d < %d?)\n",
-							 discKeyInterval, ptpClock->securityDS.latestInterval, discKeyInterval);
 
 					/* the disclosed key is new, so verify it */
 					if (ptpClock->securityDS.latestInterval < discKeyInterval) {
@@ -1641,6 +1683,12 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				 			 * - if all are good, become not paranoid
 				 			 * - if x of them are bad, become paranoid
 				 			 */
+
+                            /*************************** debug buffer dump *****************************/
+                            INFO("verifying buffered messages in buffer %d...\n", discKeyInterval);
+                            dumpBuffer(ptpClock->securityDS.buffers[discKeyInterval], dumpBufferedMsg);
+
+                            /************************* end debug buffer dump *****************************/
 						}
 						/* disclosed key failed verification; discard this packet (TODO hasn't it been buffered already?) */
 						else {
@@ -1656,6 +1704,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				 * if i'm not paranoid, store the message in the bucket
 				 * if i'm paranoid, store the message but return (don't sync with this message)
 				 */
+
+
 
 
 			}

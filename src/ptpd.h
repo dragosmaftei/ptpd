@@ -15,6 +15,10 @@
  * It defines functions which are not dependant of the operating system.
  */
 
+#ifndef PTPD_H_
+#define PTPD_H_
+
+
 #define DM_MSGS 1
 /* this is to easily turn on code highlighting for PTPD_SECURITY blocks, should be turned off before compiling */
 #define DEFINE_SECURITY 0
@@ -23,8 +27,6 @@
 #define PTPD_SECURITY
 #endif /* DEFINE_SECURITY */
 
-#ifndef PTPD_H_
-#define PTPD_H_
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
@@ -176,6 +178,7 @@
 
 #ifdef PTPD_SECURITY
 #include "dm_security.h"
+#include "sec_buffers.h"
 #endif /* PTPD_SECURITY */
 
 #ifdef PTPD_STATISTICS

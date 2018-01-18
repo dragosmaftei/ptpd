@@ -91,6 +91,8 @@ endif
 if SECURITY
 ptpd2_SOURCES +=dm_security.h
 ptpd2_SOURCES +=dm_security.c
+ptpd2_SOURCES +=sec_buffers.h
+ptpd2_SOURCES +=sec_buffers.c
 endif
 
 CSCOPE = cscope

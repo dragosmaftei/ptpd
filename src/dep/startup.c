@@ -932,27 +932,49 @@ configcheck:
 	SecurityDS *secDS = &ptpClock->securityDS;
 	SecurityOpts *secOpts = &rtOpts->securityOpts;
 
-	secDS->latestInterval = -1;
+    if (secOpts->delayed) {
+        secDS->latestInterval = -1;
 
-	/* allocate memory for the key pointers in the verified keys chain */
-	if (!(secDS->verifiedKeys = calloc(secOpts->chainLength + 1, sizeof(unsigned char *)))) {
-		/* DM:TODO what to do if calloc fails here? */
-	}
-	else {
-		//DM:TODO should we allocate EVP_MAX_MD_SIZE for keys, isntead of keyLen? have wrapper function for this?
-		/* allocate memory for all the keys in the chain */
-		for (i = 0; i < secOpts->chainLength + 1; i++) {
-			if (!(secDS->verifiedKeys[i] = calloc(1, secOpts->keyLen))) {
-				/* DM:TODO what to do fi calloc fails here? */
-				break;
-			}
-		}
+        /* allocate memory for the key pointers in the verified keys chain */
+        if (!(secDS->verifiedKeys = calloc(secOpts->chainLength + 1, sizeof(unsigned char *)))) {
+            /* on calloc fail, following the same model as above code */
+            PERROR("failed to allocate memory for delayed security processing verified keys");
+            *ret = 2;
+            free(ptpClock);
+            goto fail;
+        } else {
+            //DM:TODO should we allocate EVP_MAX_MD_SIZE for keys, isntead of keyLen? have wrapper function for this?
+            /* allocate memory for all the keys in the chain */
+            for (i = 0; i < secOpts->chainLength + 1; i++) {
+                if (!(secDS->verifiedKeys[i] = calloc(1, secOpts->keyLen))) {
+                    PERROR("failed to allocate memory for delayed security processing verified keys");
+                    *ret = 2;
+                    free(ptpClock);
+                    goto fail;
+                }
+            }
 
-		/* copy the trust anchor, i.e. the only 'verified key' we have at the beginning, into last slot */
-		memcpy(secDS->verifiedKeys[secOpts->chainLength], secOpts->trustAnchor, secOpts->keyLen);
-	}
+            /* copy the trust anchor, i.e. the only 'verified key' we have at the beginning, into last slot */
+            memcpy(secDS->verifiedKeys[secOpts->chainLength], secOpts->trustAnchor, secOpts->keyLen);
+        }
 
+        /* allocate buffers (pointers), one for every time interval */
+        if (!(secDS->buffers = calloc(secOpts->chainLength, sizeof(Buffer *)))) {
+            PERROR("failed to allocate memory for delayed security processing buffers");
+            *ret = 2;
+            free(ptpClock);
+            goto fail;
+        }
 
+        /* allocate memory for each Buffer in the buffers array; returns 0 if a calloc fails */
+        if (!initBuffers(secDS->buffers, secOpts->chainLength)) {
+            PERROR("failed to allocate memory for delayed security processing buffers");
+            *ret = 2;
+            free(ptpClock);
+            goto fail;
+        }
+
+    }
 
 #endif /* PTPD_SECURITY */
 

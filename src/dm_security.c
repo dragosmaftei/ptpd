@@ -3,7 +3,6 @@
 //
 
 #include "dm_security.h"
-#include <string.h>
 #include <openssl/hmac.h> /* includes HMAC and EVP_sha256() */
 //#include <openssl/evp.h> /* this has EVP_sha256() only */
 

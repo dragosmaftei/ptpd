@@ -11,6 +11,9 @@
 #endif /* PTPD_STATISTICS */
 #include "dep/alarms.h"
 
+#ifdef PTPD_SECURITY
+#include "sec_buffers.h"
+#endif /* PTPD_SECURITY */
 
 /**
  * \struct PtpdCounters
@@ -238,24 +241,6 @@ typedef enum IntegrityAlgTyp {
 	HMAC_SHA256,
 	GMAC_AES256
 } IntegrityAlgTyp;
-
-/*
- * for delayed security processing, we need to buffer messages for later verification
- * a BufferedMsg is a linked list style node that holds a PTP message
- */
-typedef struct BufferedMsg {
-	char *msg;
-	struct BufferedMsg *next;
-} BufferedMsg;
-
-/*
- * a Buffer is a linked list of BufferedMsgs representing all buffered messages for a given time interval
- */
-typedef struct Buffer {
-	BufferedMsg *head;
-	BufferedMsg *tail;
-	int size;
-} Buffer;
 
 /*
  * SecurityOpts struct holds security parameters that - in a future implementation that integrates with a key mgmt
