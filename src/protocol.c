@@ -1565,12 +1565,11 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
 
 			/*
-             * if delayed processing, save correction field and zero it out before calculating ICV
-             * fill it back in the buffer later
+			 * save correction field and zero it out if doing immediate and ignoring correction field
+             * if delayed processing, this will be done later, when verifying previously buffered messages
              */
 			Integer64 correctionFieldTmp;
-			if (secOpts->delayed ||
-				(!secOpts->delayed && secOpts->immIgnoreCorrection)) {
+			if (!secOpts->delayed && secOpts->immIgnoreCorrection) {
 				memcpy(&correctionFieldTmp.msb, (ptpClock->msgIbuf + 8), 4);
 				memcpy(&correctionFieldTmp.lsb, (ptpClock->msgIbuf + 12), 4);
 				/* don't need to flip the values copied into correctionFieldTmp since they won't be interpreted/used */
@@ -1580,7 +1579,10 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			/* for immediate, just use the one key */
 			unsigned char *key = secOpts->key;
 
-			/* DM:TODO delayed processing case */
+			/*
+			 * delayed processing case steps:
+			 * DM:TODO fill in summary of steps
+			 */
 			if (secOpts->delayed) {
 				/*
 				 * safe packet test
@@ -1590,61 +1592,11 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				 */
 				if (isSafePacket(timeStamp, sec_tlv.keyID, secOpts)) {
                     ptpClock->counters.safePackets++;
-                    //DM:TODO buffer here or later?
-                    //DM: TODO buffer with correction field present or zeroed out?
-                    /*
-                     * buffer message into the buffer corresponding to the current interval
-                     * pass packet length including the security TLV; packetlength + sectlvlength, or packetlength from header?
-                     */
-                    //DM: TODO check bufferMessage for failure - fails if memoryallocation fails
-                    bufferMessage(ptpClock->securityDS.buffers[sec_tlv.keyID], ptpClock->msgIbuf,
-                                  ptpClock->msgTmpHeader.messageLength);
-
-                    /********************************* debuf info ****************************************/
-                    /* debug info, buffering into buffer x, message type, seqid, icv first and last bytes */
-                    char messageTypeString[25];
-
-                    switch (ptpClock->msgTmpHeader.messageType) {
-                        case ANNOUNCE:
-                            strcpy(messageTypeString, "announce");
-                            break;
-                        case SYNC:
-                            strcpy(messageTypeString, "sync");
-                            break;
-                        case FOLLOW_UP:
-                            strcpy(messageTypeString, "followup");
-                            break;
-                        case PDELAY_REQ:
-                            strcpy(messageTypeString, "pd_req");
-                            break;
-                        case PDELAY_RESP:
-                            strcpy(messageTypeString, "pd_resp");
-                            break;
-                        case PDELAY_RESP_FOLLOW_UP:
-                            strcpy(messageTypeString, "pd_respfollowup");
-                            break;
-                        default:
-                            strcpy(messageTypeString, "unknown message type");
-                            break;
-                    }
-
-                    char firstICVByte = ptpClock->msgIbuf[packetLength + secTLVLen - secOpts->icvLength];
-                    char lastICVByte = ptpClock->msgIbuf[packetLength + secTLVLen - 1];
-
-                    INFO("buffering msg into buff %d, type: %s (seqid %04x) w/ ICV: %02x...%02x\n",
-                         sec_tlv.keyID, messageTypeString, ptpClock->msgTmpHeader.sequenceId,
-                         firstICVByte, lastICVByte);
-
-
-                    /********************************* end debug info ****************************************/
-
-
                 } else {
                     ptpClock->counters.unsafePackets++;
 					if (DM_MSGS)
 						INFO("DM: unsafe packet seqid %04x from %02x\n", ptpClock->msgTmpHeader.sequenceId,
                         ptpClock->msgTmpHeader.sourcePortIdentity.clockIdentity[0]);
-                    //TODO correciton field won't get restored, but that might not even be necessary?
                     return;
                 }
 
@@ -1679,10 +1631,11 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                                 INFO("DM: verified key %02x (interval: %d)\n", discKey[0], discKeyInterval);
 							ptpClock->counters.keyVerificationSuccesses++;
 
-							/*
-				 			 * verify buffered messages
-				 			 * - if all are good, become not paranoid
-				 			 * - if x of them are bad, become paranoid
+							/* DM:TODO
+				 			 * 1. extract/copy message from buffer (correction field not zeroed yet) into local buf
+				 			 * 2. zero correction field
+				 			 * 3. verify integrity
+				 			 * 4. store result of integrity check in BufferedMsg (correction field untouched there)
 				 			 */
 
                             /*************************** debug buffer dump *****************************/
@@ -1691,7 +1644,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
                             /************************* end debug buffer dump *****************************/
 						}
-						/* disclosed key failed verification; discard this packet (TODO hasn't it been buffered already?) */
+						/* disclosed key failed verification; discard this packet */
 						else {
 							ptpClock->counters.keyVerificationFails++;
 							if (DM_MSGS)
@@ -1700,14 +1653,56 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 						}
 					}
 				}
+                /*
+                 * packet is safe; already addressed disclosed key if present by checking if it's new, verifying it,
+                 * and using it to check previously buffered messages
+                 * now, buffer current message into the buffer corresponding to the current interval
+                 * pass packet length including the security TLV; packetlength + sectlvlength, or packetlength from header?
+                 */
+                if (!(bufferMessage(ptpClock->securityDS.buffers[sec_tlv.keyID], ptpClock->msgIbuf,
+                              ptpClock->msgTmpHeader.messageLength))) {
+                    /* memory allocation in buffering the message failed */
+                    //DM: TODO how to exit upon malloc failure?
 
-				/*
-				 * if i'm not paranoid, store the message in the bucket
-				 * if i'm paranoid, store the message but return (don't sync with this message)
-				 */
+                }
+
+                /********************************* debuf info ****************************************/
+                /* debug info, buffering into buffer x, message type, seqid, icv first and last bytes */
+                char messageTypeString[25];
+
+                switch (ptpClock->msgTmpHeader.messageType) {
+                    case ANNOUNCE:
+                        strcpy(messageTypeString, "announce");
+                        break;
+                    case SYNC:
+                        strcpy(messageTypeString, "sync");
+                        break;
+                    case FOLLOW_UP:
+                        strcpy(messageTypeString, "followup");
+                        break;
+                    case PDELAY_REQ:
+                        strcpy(messageTypeString, "pd_req");
+                        break;
+                    case PDELAY_RESP:
+                        strcpy(messageTypeString, "pd_resp");
+                        break;
+                    case PDELAY_RESP_FOLLOW_UP:
+                        strcpy(messageTypeString, "pd_respfollowup");
+                        break;
+                    default:
+                        strcpy(messageTypeString, "unknown message type");
+                        break;
+                }
+
+                char firstICVByte = ptpClock->msgIbuf[packetLength + secTLVLen - secOpts->icvLength];
+                char lastICVByte = ptpClock->msgIbuf[packetLength + secTLVLen - 1];
+
+                INFO("buffering msg into buff %d, type: %s (seqid %04x) w/ ICV: %02x...%02x\n",
+                     sec_tlv.keyID, messageTypeString, ptpClock->msgTmpHeader.sequenceId,
+                     firstICVByte, lastICVByte);
 
 
-
+                /********************************* end debug info ****************************************/
 
 			}
             /*
@@ -1724,11 +1719,10 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			}
 
 			/*
-             * for delayed, restore correctionField to its previous value before it was zeroed out (might not even be
-             * strictly necessary since the header information from msgIbuf was already pulled out into msgTmpHeader
+             * restore correctionField to its previous value before it was zeroed out (might not even be
+             * strictly necessary since the header information from msgIbuf was already pulled out into msgTmpHeader)
              */
-			if (secOpts->delayed ||
-				(!secOpts->delayed && secOpts->immIgnoreCorrection)) {
+			if (!secOpts->delayed && secOpts->immIgnoreCorrection) {
 				memcpy((ptpClock->msgIbuf + 8), &correctionFieldTmp.msb, 4);
 				memcpy((ptpClock->msgIbuf + 12), &correctionFieldTmp.lsb, 4);
 			}

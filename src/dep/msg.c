@@ -1783,8 +1783,6 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
         currentInterval = timeInternalToDouble(&elapsed) / secOpts->intervalDuration;
         discKeyInterval = currentInterval - secOpts->disclosureDelay;
 
-        //DM:TODO how to disclose the last <disclosureDelay> keys?
-
         /* if exhausted the keychain, return 0, don't add TLV anymore */
         if (currentInterval >= secOpts->chainLength) {
             if (DM_MSGS)
@@ -1861,8 +1859,8 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
     }
 
     /*
-     * if delayed processing, save correction field and zero it out before calculating ICV
-     * fill it back in the buffer later
+     * if delayed processing (or if imm but ignoring correction field), save correction field and
+     * zero it out before calculating ICV; fill it back in the buffer later
      */
     Integer64 correctionFieldTmp;
 
