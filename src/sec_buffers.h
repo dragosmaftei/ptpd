@@ -6,6 +6,7 @@
 #define SEC_BUFFERS_H_
 
 #include <stdlib.h> /* for size_t */
+//#include "ptp_datatypes.h" /* for boolean, but can't include it, bc ptp_datatypes.h spits unknown CLOCK_IDENTITY_LENGTH */
 
 /*
  * for delayed security processing, we need to buffer messages for later verification
@@ -13,7 +14,9 @@
  */
 typedef struct BufferedMsg {
     char *msg;
+    size_t len; /* the packet length is a field in the header, but storing it here for ease of access later on */
     struct BufferedMsg *next;
+    int icvFailed; /* used to mark failed ICV checks when verifying previously buffered messages */
 } BufferedMsg;
 
 /*

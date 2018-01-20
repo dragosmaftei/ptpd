@@ -4,7 +4,7 @@
 
 #include "sec_buffers.h" /* for prototypes, also gives stdlib.h */
 #include "ptpd.h" /* gives string.h for memcpy, as well as INFO macro  */
-#include "ptp_datatypes.h"
+//#include "ptp_datatypes.h"
 /* can't include ptpd.h in sec_buffers.h, otherwise datatypes.h spits "unknown type Buffer" */
 
 /* used by bufferMessage */
@@ -19,6 +19,8 @@ int initBufferedMsg(BufferedMsg *bm, char *m, size_t len) {
         return 0;
     }
 
+    bm->len = len;
+    bm->icvFailed = FALSE;
     bm->next = 0;
 
     return 1;

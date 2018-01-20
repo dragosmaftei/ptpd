@@ -1609,13 +1609,22 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				if ((sec_tlv.secParamIndicator & SPI_DISCLOSED_KEY) == SPI_DISCLOSED_KEY) {
 					Integer16 discKeyInterval = sec_tlv.keyID - secOpts->disclosureDelay;
 
-					/* the disclosed key is new, so verify it */
+					/* check if the disclosed key is new */
 					if (ptpClock->securityDS.latestInterval < discKeyInterval) {
 						/*
 				 		 * key verification for a new key
 				 		 * - if key verification fails, discard this packet
 				 		 * - if key is good, use it to verify buffered messages
 				 		 */
+
+                        /* if this difference is 1, then the only buffer that contains messages that will need to be
+                         * verified is the one that corresponds to discKeyInterval
+                         * if this difference <d> is greater than 1, then it means we missed <d-1> previous keys, and
+                         * therefore, if the current disclosed key passes verification, then by virtue of the hash chain
+                         * we also will discover the <d-1> missing keys and will need to verify the messages in the
+                         * <d-1> buffers older than the discKeyInterval buffer. confused yet?
+                         */
+                        Integer16 numUnverifiedBuffers = discKeyInterval - ptpClock->securityDS.latestInterval;
 
 						/* disclosed key is at TLV offset 10 */
 						unsigned char *discKey = (unsigned char *)ptpClock->msgIbuf + packetLength + 10;
@@ -1631,18 +1640,66 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                                 INFO("DM: verified key %02x (interval: %d)\n", discKey[0], discKeyInterval);
 							ptpClock->counters.keyVerificationSuccesses++;
 
-							/* DM:TODO
-				 			 * 1. extract/copy message from buffer (correction field not zeroed yet) into local buf
-				 			 * 2. zero correction field
-				 			 * 3. verify integrity
-				 			 * 4. store result of integrity check in BufferedMsg (correction field untouched there)
-				 			 */
+                            /*
+                             * need to loop here in case we gained more than 1 new key as part of the key verification
+                             */
+                            for (; numUnverifiedBuffers > 0; numUnverifiedBuffers--) {
+                                /*
+                                 * if there's only 1 unverified buffer (most common case), then the buffer here will be
+                                 * the one corresponding to the discKeyInterval; otherwise, this will start with the
+                                 * unverified buffer and work towards the latest one (corresponding to discKeyInterval)
+                                 */
+                                Integer16 targetInterval = discKeyInterval - numUnverifiedBuffers + 1;
+                                Buffer *targetBuffer = ptpClock->securityDS.buffers[targetInterval];
+                                BufferedMsg *cur = targetBuffer->head;
+                                /*
+                                  * 1. extract/copy message from buffer (correction field not zeroed yet) into local buf
+                                  * 2. zero correction field
+                                  * 3. verify integrity
+                                  * 4. store result of integrity check in BufferedMsg (correction field untouched there)
+                                  */
+                                while (cur) {
+                                    /* 1. copy msg into temp buffer where we can zero out correction field */
+                                    Octet tmpBuf[PACKET_SIZE];
+                                    memcpy(tmpBuf, cur->msg, cur->len);
 
-                            /*************************** debug buffer dump *****************************/
-                            INFO("verifying buffered messages in buffer %d...\n", discKeyInterval);
-                            dumpBuffer(ptpClock->securityDS.buffers[discKeyInterval], dumpBufferedMsg);
+                                    /* 2. zero out correction field */
+                                    memset(tmpBuf + 8, 0, 8); /* zero out the correction field */
 
-                            /************************* end debug buffer dump *****************************/
+                                    /*
+                                     * 3. calculate and verify ICV, passing in secOpts, buffer, icvOffset, and key
+                                     * returns false if verification fails, otherwise proceed
+                                     */
+                                    key = ptpClock->securityDS.verifiedKeys[secOpts->chainLength - targetInterval - 1];
+                                    if (calculateAndVerifyICV(secOpts,
+                                                              (unsigned char *) tmpBuf,
+                                                              cur->len - secOpts->icvLength,
+                                                              key) == FALSE) {
+                                        ptpClock->counters.securityErrors++;
+                                        ptpClock->counters.icvMismatchErrors++;
+                                        if (DM_MSGS)
+                                            INFO("DM: icv's DIDNT MATCH on seqid %04x\n",
+                                                 ptpClock->msgTmpHeader.sequenceId);
+
+                                        /* 4. mark the BufferedMsg as having failed icv check */
+                                        cur->icvFailed = TRUE;
+                                    }
+                                    /* if icv check passed, move on, since we already used this message when it was buffered */
+                                    cur = cur->next;
+                                }
+
+                                /* TODO
+                                 * at this point, ICVs for all messages in the buffer have been checked and the ones
+                                 * that didn't pass were marked as such; now need to use this information to 'undo' the
+                                 * effects of any messages that failed the ICV check
+                                 */
+
+                                /*************************** debug buffer dump *****************************/
+                                INFO("verifying buffered messages in buffer %d...\n", targetInterval);
+                                dumpBuffer(ptpClock->securityDS.buffers[targetInterval], dumpBufferedMsg);
+
+                                /************************* end debug buffer dump *****************************/
+                            }
 						}
 						/* disclosed key failed verification; discard this packet */
 						else {
@@ -1662,7 +1719,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                 if (!(bufferMessage(ptpClock->securityDS.buffers[sec_tlv.keyID], ptpClock->msgIbuf,
                               ptpClock->msgTmpHeader.messageLength))) {
                     /* memory allocation in buffering the message failed */
-                    //DM: TODO how to exit upon malloc failure?
+                    //DM: TODO exit from here upon malloc failure
 
                 }
 
