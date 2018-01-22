@@ -1622,7 +1622,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                          * if this difference <d> is greater than 1, then it means we missed <d-1> previous keys, and
                          * therefore, if the current disclosed key passes verification, then by virtue of the hash chain
                          * we also will discover the <d-1> missing keys and will need to verify the messages in the
-                         * <d-1> buffers older than the discKeyInterval buffer. confused yet?
+                         * <d-1> buffers older than the discKeyInterval buffer
                          */
                         Integer16 numUnverifiedBuffers = discKeyInterval - ptpClock->securityDS.latestInterval;
 
@@ -1666,11 +1666,18 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                                     /* 2. zero out correction field */
                                     memset(tmpBuf + 8, 0, 8); /* zero out the correction field */
 
+                                    /* need to generate ICV key from the target key first */
+                                    unsigned char ICVKey[MAX_SEC_KEY_LEN];
+                                    memset(ICVKey, 0, MAX_SEC_KEY_LEN);
+                                    int targetKeyIndex = secOpts->chainLength - 1 - targetInterval;
+                                    /* generate icv key using keychain key, hashing over 1; result is placed in 1st arg */
+                                    generate_icv_key(ICVKey, ptpClock->securityDS.verifiedKeys[targetKeyIndex], secOpts->keyLen);
+                                    key = ICVKey;
+
                                     /*
-                                     * 3. calculate and verify ICV, passing in secOpts, buffer, icvOffset, and key
-                                     * returns false if verification fails, otherwise proceed
-                                     */
-                                    key = ptpClock->securityDS.verifiedKeys[secOpts->chainLength - targetInterval - 1];
+                                    * 3. calculate and verify ICV, passing in secOpts, buffer, icvOffset, and key
+                                    * returns false if verification fails, otherwise proceed
+                                    */
                                     if (calculateAndVerifyICV(secOpts,
                                                               (unsigned char *) tmpBuf,
                                                               cur->len - secOpts->icvLength,
