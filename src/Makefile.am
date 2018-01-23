@@ -89,8 +89,8 @@ endif
 
 # SECURITY
 if SECURITY
-ptpd2_SOURCES +=dm_security.h
-ptpd2_SOURCES +=dm_security.c
+ptpd2_SOURCES +=security.h
+ptpd2_SOURCES +=security.c
 ptpd2_SOURCES +=sec_buffers.h
 ptpd2_SOURCES +=sec_buffers.c
 endif

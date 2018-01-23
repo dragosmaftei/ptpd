@@ -335,13 +335,13 @@ UInteger16 packSMCancelUnicastTransmission( MsgSignaling*, Octet*);
 void unpackSMAcknowledgeCancelUnicastTransmission( Octet* buf, MsgSignaling*, PtpClock* );
 UInteger16 packSMAcknowledgeCancelUnicastTransmission( MsgSignaling*, Octet*);
 
-/* DM: Security TLV packing / unpacking */
+/* Security TLV packing / unpacking */
 #ifdef PTPD_SECURITY
 void msgUnpackSecurityTLV(Octet * buf, SecurityTLV *data, PtpClock *ptpClock);
+void msgPackSecurityTLV(SecurityTLV *data, Octet *buf);
 UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgClassGeneral);
 void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteger16 icvOffset, unsigned char *key);
 Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, UInteger16 icvOffset, unsigned char *key);
-void freeSecurityOpts(SecurityOpts *secOpts);
 #endif /* PTPD_SECURITY */
 
 void unpackPortAddress( Octet* buf, PortAddress*, PtpClock*);

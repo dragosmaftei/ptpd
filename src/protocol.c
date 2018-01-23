@@ -1253,7 +1253,7 @@ recordTimingMeasurement(PtpClock *ptpClock, Enumeration4Lower type, Boolean recv
 	struct timespec *totals;
     struct timespec *array;
 
-	//INFO("DM: recordTimingMeasurement: type is: %02x\n", type);
+	//INFO("SEC: recordTimingMeasurement: type is: %02x\n", type);
 
 	switch (type) {
 		case ANNOUNCE:
@@ -1366,8 +1366,8 @@ Boolean isSafePacket(TimeInternal *recvTime, UInteger32 i, SecurityOpts *secOpts
 	 */
 	UInteger16 x = (t_j - T_0) / secOpts->intervalDuration;
 
-    //DM:TODO remove debug
-    //INFO("DM: safe packet test x < i + d: %d < %d + %d\n", x, i, secOpts->disclosureDelay);
+    //SEC:TODO remove debug
+    //INFO("SEC: safe packet test x < i + d: %d < %d + %d\n", x, i, secOpts->disclosureDelay);
 	/*
 	 * verify that x < i + d (where i is the interval index), which implies that the sender is not yet in the
 	 * interval during which it discloses the key K_i.
@@ -1376,8 +1376,6 @@ Boolean isSafePacket(TimeInternal *recvTime, UInteger32 i, SecurityOpts *secOpts
 }
 
 #endif /* PTPD_SECURITY */
-
-
 
 void
 processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp, ssize_t length)
@@ -1422,7 +1420,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
     struct timespec start, stop;
 
     if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
-        if(DM_MSGS) INFO("DM: get start time in receive failed\n");
+        if(SEC_MSGS) INFO("SEC: get start time in receive failed\n");
 #endif /* RUNTIME_DEBUG */
 
     /*
@@ -1430,7 +1428,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
      * answer the question 'do we want security processing on this packet?' if yes, the query would return an SPP
      * which would be used to query the SAD to get the relevant SA, which contains necessary security parameters
      *
-     * DM:master doing delayed will ignore this whole block to avoid processing msgs from self
+     * master doing delayed will ignore this whole block to avoid processing msgs from self
      * if doing delayed and master, should not be receiving any secured messages, so skip this... this is an ugly
      * work around; an SPD query should give this information. this is to avoid doing processing msgs from self...
      */
@@ -1483,8 +1481,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			if (sec_tlv.tlvType != SECURITY) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.securityTLVExpectedErrors++;
-				if (DM_MSGS)
-					INFO("DM: security enabled, security flag set, but TLV type not correct on seqid %04x\n",
+				if (SEC_MSGS)
+					INFO("SEC: security enabled, security flag set, but TLV type not correct on seqid %04x\n",
 						 ptpClock->msgTmpHeader.sequenceId);
 				return;
 			}
@@ -1503,8 +1501,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			if (sec_tlv.SPP != secOpts->SPP) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.SPPMismatchErrors++;
-				if (DM_MSGS)
-					INFO("DM: SPP mismatch on seqid %04x\n",
+				if (SEC_MSGS)
+					INFO("SEC: SPP mismatch on seqid %04x\n",
 						 ptpClock->msgTmpHeader.sequenceId);
 				return;
 			}
@@ -1541,8 +1539,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			if (secTLVLen != sec_tlv.lengthField + 4) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.lengthMismatchErrors++;
-				if (DM_MSGS)
-					INFO("DM: length mismatch on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+				if (SEC_MSGS)
+					INFO("SEC: length mismatch on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
 				return;
 			}
 
@@ -1554,8 +1552,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			if (!secOpts->delayed && secOpts->keyID != sec_tlv.keyID) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.keyIDMismatchErrors++;
-				if (DM_MSGS)
-					INFO("DM: keyID mismatch on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+				if (SEC_MSGS)
+					INFO("SEC: keyID mismatch on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
 				return;
 			}
 
@@ -1580,8 +1578,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			unsigned char *key = secOpts->key;
 
 			/*
-			 * delayed processing case steps:
-			 * DM:TODO fill in summary of steps
+			 * delayed processing case steps RFC4082 3.5:
+			 * 1. safe packet test, 2. new key index test, 3. key verification tests, 4. message verification tests
 			 */
 			if (secOpts->delayed) {
 				/*
@@ -1594,8 +1592,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                     ptpClock->counters.safePackets++;
                 } else {
                     ptpClock->counters.unsafePackets++;
-					if (DM_MSGS)
-						INFO("DM: unsafe packet seqid %04x from %02x\n", ptpClock->msgTmpHeader.sequenceId,
+					if (SEC_MSGS)
+						INFO("SEC: unsafe packet seqid %04x from %02x\n", ptpClock->msgTmpHeader.sequenceId,
                         ptpClock->msgTmpHeader.sourcePortIdentity.clockIdentity[0]);
                     return;
                 }
@@ -1636,8 +1634,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 							/* new key has been verified and added to the verified keys; update latest interval */
 							ptpClock->securityDS.latestInterval = discKeyInterval;
 
-                            if (DM_MSGS)
-                                INFO("DM: verified key %02x (interval: %d)\n", discKey[0], discKeyInterval);
+                            if (SEC_MSGS)
+                                INFO("SEC: verified key %02x (interval: %d)\n", discKey[0], discKeyInterval);
 							ptpClock->counters.keyVerificationSuccesses++;
 
                             /*
@@ -1684,8 +1682,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                                                               key) == FALSE) {
                                         ptpClock->counters.securityErrors++;
                                         ptpClock->counters.icvMismatchErrors++;
-                                        if (DM_MSGS)
-                                            INFO("DM: icv's DIDNT MATCH on seqid %04x\n",
+                                        if (SEC_MSGS)
+                                            INFO("SEC: icv's DIDNT MATCH on seqid %04x\n",
                                                  ptpClock->msgTmpHeader.sequenceId);
 
                                         /* 4. mark the BufferedMsg as having failed icv check */
@@ -1695,14 +1693,14 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                                     cur = cur->next;
                                 }
 
-                                /* TODO
+                                /* SEC:TODO
                                  * at this point, ICVs for all messages in the buffer have been checked and the ones
                                  * that didn't pass were marked as such; now need to use this information to 'undo' the
                                  * effects of any messages that failed the ICV check
                                  */
 
                                 /*************************** debug buffer dump *****************************/
-                                INFO("verifying buffered messages in buffer %d...\n", targetInterval);
+                                INFO("SEC: verifying buffered messages in buffer %d...\n", targetInterval);
                                 dumpBuffer(ptpClock->securityDS.buffers[targetInterval], dumpBufferedMsg);
 
                                 /************************* end debug buffer dump *****************************/
@@ -1711,8 +1709,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 						/* disclosed key failed verification; discard this packet */
 						else {
 							ptpClock->counters.keyVerificationFails++;
-							if (DM_MSGS)
-                                INFO("DM: keyver failed on key %02x (interval: %d)\n", discKey[0], discKeyInterval);
+							if (SEC_MSGS)
+                                INFO("SEC: keyver failed on key %02x (interval: %d)\n", discKey[0], discKeyInterval);
 							return;
 						}
 					}
@@ -1725,9 +1723,10 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                  */
                 if (!(bufferMessage(ptpClock->securityDS.buffers[sec_tlv.keyID], ptpClock->msgIbuf,
                               ptpClock->msgTmpHeader.messageLength))) {
-                    /* memory allocation in buffering the message failed */
-                    //DM: TODO exit from here upon malloc failure
-
+                    /* memory allocation in buffering the message failed - is this the right way to shutdown and exit? */
+					PERROR("SEC: failed to allocate memory for buffering message");
+					ptpdShutdown(ptpClock);
+					exit(1);
                 }
 
                 /********************************* debuf info ****************************************/
@@ -1777,8 +1776,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 								  packetLength + secTLVLen - secOpts->icvLength, key) == FALSE) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.icvMismatchErrors++;
-				if (DM_MSGS)
-					INFO("DM: icv's DIDNT MATCH on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+				if (SEC_MSGS)
+					INFO("SEC: icv's DIDNT MATCH on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
 				return;
 			}
 
@@ -1804,8 +1803,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                         (!secOpts->slaveAcceptInsecureAnnounce && ptpClock->portDS.portState == PTP_SLAVE)) {
                         ptpClock->counters.securityErrors++;
                         ptpClock->counters.securityTLVExpectedErrors++;
-                        if (DM_MSGS)
-                            INFO("DM: security enabled, expecting secured announce messages, but message is missing security flag in header on seqid %04x\n",
+                        if (SEC_MSGS)
+                            INFO("SEC: security enabled, expecting secured announce messages, but message is missing security flag in header on seqid %04x\n",
                                  ptpClock->msgTmpHeader.sequenceId);
                         return;
                     }
@@ -1820,8 +1819,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                         (!secOpts->slaveAcceptInsecureSyncFollowup && ptpClock->portDS.portState == PTP_SLAVE)) {
                         ptpClock->counters.securityErrors++;
                         ptpClock->counters.securityTLVExpectedErrors++;
-                        if (DM_MSGS)
-                            INFO("DM: security enabled, expecting secured sync & followup messages, but message is missing security flag in header on seqid %04x\n",
+                        if (SEC_MSGS)
+                            INFO("SEC: security enabled, expecting secured sync & followup messages, but message is missing security flag in header on seqid %04x\n",
                                  ptpClock->msgTmpHeader.sequenceId);
                         return;
                     }
@@ -1838,8 +1837,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                         (!secOpts->slaveAcceptInsecurePdelays && ptpClock->portDS.portState == PTP_SLAVE)) {
                         ptpClock->counters.securityErrors++;
                         ptpClock->counters.securityTLVExpectedErrors++;
-                        if (DM_MSGS)
-                            INFO("DM: security enabled, expecting secured pdelay messages, but message is missing security flag in header on seqid %04x\n",
+                        if (SEC_MSGS)
+                            INFO("SEC: security enabled, expecting secured pdelay messages, but message is missing security flag in header on seqid %04x\n",
                                  ptpClock->msgTmpHeader.sequenceId);
                         return;
                     }
@@ -1854,7 +1853,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
 #ifdef RUNTIME_DEBUG
     if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
-        if(DM_MSGS) INFO("DM: get stop time in receive failed\n");
+        if(SEC_MSGS) INFO("SEC: get stop time in receive failed\n");
 
     /* this will increment the num measurements and add the current measurement to a running total */
     recordTimingMeasurement(ptpClock, ptpClock->msgTmpHeader.messageType, TRUE, &stop, &start);
@@ -3512,19 +3511,19 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
 
 	// timing measurement of security processing
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
-		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
+		if(SEC_MSGS) INFO("SEC: get start time in send sync failed\n");
 #endif /* RUNTIME_DEBUG */
 
-    // DM:TODO remove these debugs
+    // SEC:TODO remove these debugs
     // debug trying to see what time is
     TimeInternal myt;
     getTime(&myt);
     char tmpBuf[200];
     memset(tmpBuf, 0, sizeof(tmpBuf));
     snprint_TimeInternal(tmpBuf, sizeof(tmpBuf), &myt);
-    //INFO("DM: time (TimeInternal) as string is: %s\n", tmpBuf);
+    //INFO("SEC: time (TimeInternal) as string is: %s\n", tmpBuf);
     //timeInternal_display(&myt); // this uses DBG which only works if all DBG levels are enabled... annoying
-    //INFO("DM: time (TimeInternal) as double: %f\n", timeInternalToDouble(&myt)); works
+    //INFO("SEC: time (TimeInternal) as double: %f\n", timeInternalToDouble(&myt)); works
 
     // debug print elapsed time since startTime: result, x - y
     TimeInternal elapsed;
@@ -3532,12 +3531,12 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
     subTime(&elapsed, &myt, &rtOpts->securityOpts.startTime);
 
     snprint_TimeInternal(tmpBuf, sizeof(tmpBuf), &elapsed);
-    //INFO("DM: cur time - start time is: %s\n", tmpBuf);
+    //INFO("SEC: cur time - start time is: %s\n", tmpBuf);
 
-    // DM: debug printing the current time interval
+    // debug printing the current time interval
     int interval = timeInternalToDouble(&elapsed) / rtOpts->securityOpts.intervalDuration;
     interval = interval % rtOpts->securityOpts.chainLength;
-    INFO("DM: current interval: %d\n", interval);
+    INFO("SEC: current interval: %d\n", interval);
 
 
 	/*
@@ -3562,7 +3561,7 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
 #ifdef RUNTIME_DEBUG
 
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
-		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
+		if(SEC_MSGS) INFO("SEC: get stop time in send sync failed\n");
 
 	// this will increment the num measurements and add the current measurement to a running total
 	recordTimingMeasurement(ptpClock, ANNOUNCE, FALSE, &stop, &start);
@@ -3687,7 +3686,7 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 
     /* timing measurement of security processing */
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
-		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
+		if(SEC_MSGS) INFO("SEC: get start time in send sync failed\n");
 #endif /* RUNTIME_DEBUG */
 
 	if (rtOpts->securityEnabled &&
@@ -3698,7 +3697,7 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 
 #ifdef RUNTIME_DEBUG
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
-		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
+		if(SEC_MSGS) INFO("SEC: get stop time in send sync failed\n");
 
     /* this will increment the num measurements and add the current measurement to a running total */
 	recordTimingMeasurement(ptpClock, SYNC, FALSE, &stop, &start);
@@ -3781,7 +3780,7 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 
 	/* timing measurement of security processing */
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
-		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
+		if(SEC_MSGS) INFO("SEC: get start time in send sync failed\n");
 #endif /* RUNTIME_DEBUG */
 
 	if (rtOpts->securityEnabled &&
@@ -3792,7 +3791,7 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 
 #ifdef RUNTIME_DEBUG
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
-		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
+		if(SEC_MSGS) INFO("SEC: get stop time in send sync failed\n");
 
 	/* this will increment the num measurements and add the current measurement to a running total */
 	recordTimingMeasurement(ptpClock, FOLLOW_UP, FALSE, &stop, &start);
@@ -3941,7 +3940,7 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 
 	/* timing measurement of security processing */
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
-		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
+		if(SEC_MSGS) INFO("SEC: get start time in send sync failed\n");
 #endif /* RUNTIME_DEBUG */
 
 	if (rtOpts->securityEnabled &&
@@ -3952,7 +3951,7 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 
 #ifdef RUNTIME_DEBUG
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
-		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
+		if(SEC_MSGS) INFO("SEC: get stop time in send sync failed\n");
 
 	/* this will increment the num measurements and add the current measurement to a running total */
 	recordTimingMeasurement(ptpClock, PDELAY_REQ, FALSE, &stop, &start);
@@ -4025,7 +4024,7 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 
 	/* timing measurement of security processing */
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
-		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
+		if(SEC_MSGS) INFO("SEC: get start time in send sync failed\n");
 #endif /* RUNTIME_DEBUG */
 
 	if (rtOpts->securityEnabled &&
@@ -4036,7 +4035,7 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 
 #ifdef RUNTIME_DEBUG
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
-		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
+		if(SEC_MSGS) INFO("SEC: get stop time in send sync failed\n");
 
 	/* this will increment the num measurements and add the current measurement to a running total */
 	recordTimingMeasurement(ptpClock, PDELAY_RESP, FALSE, &stop, &start);
@@ -4123,7 +4122,7 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 
 	/* timing measurement of security processing */
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
-		if(DM_MSGS) INFO("DM: get start time in send sync failed\n");
+		if(SEC_MSGS) INFO("SEC: get start time in send sync failed\n");
 #endif /* RUNTIME_DEBUG */
 
 	if (rtOpts->securityEnabled &&
@@ -4134,7 +4133,7 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 
 #ifdef RUNTIME_DEBUG
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
-		if(DM_MSGS) INFO("DM: get stop time in send sync failed\n");
+		if(SEC_MSGS) INFO("SEC: get stop time in send sync failed\n");
 
 	/* this will increment the num measurements and add the current measurement to a running total */
 	recordTimingMeasurement(ptpClock, PDELAY_RESP_FOLLOW_UP, FALSE, &stop, &start);

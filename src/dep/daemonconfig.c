@@ -839,7 +839,7 @@ stringToBinary(char *valueString, unsigned char *value, int maxLen)
         char first, second;
         first = tohex(valueString[i * 2]);
         second = tohex(valueString[i * 2 + 1]);
-        if (DM_MSGS) printf("i: %d, first: 0x%01x, second: 0x%01x\n", i, first, second);
+        if (SEC_MSGS) printf("i: %d, first: 0x%01x, second: 0x%01x\n", i, first, second);
 
         if ((first == -1) || (second == -1)) {
             WARNING("Invalid hex character in specified input string %s; value will be zeroed out\n", valueString);
@@ -2609,7 +2609,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
     /*
      * set various security related variables based on the input
      */
-    if (DM_MSGS) {
+    if (SEC_MSGS) {
         printf("the keystring size is (should always be this): %lu\n", sizeof(rtOpts->securityOpts.keyString));
         printf("the keystring STRLEN is: %lu\n", strlen(rtOpts->securityOpts.keyString));
         printf("the keyString is:\n\t");
@@ -2648,10 +2648,9 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
                 /* first key in chain is the 'random' start key, read in from config file above */
                 secOpts->keyChain[0] = secOpts->key;
 
-				//DM:TODO should we allocate EVP_MAX_MD_SIZE for keys, isntead of keyLen? have wrapper function for this?
-                /* allocate memory for the rest of the keys in the chain */
+                /* allocate memory for the rest of the keys in the chain; use EVP_MAX_MD_SIZE instead of keyLen */
                 for (int i = 1; i < secOpts->chainLength + 1; i++) {
-                    if (!(secOpts->keyChain[i] = calloc(1, secOpts->keyLen))) {
+                    if (!(secOpts->keyChain[i] = calloc(1, ptpd_EVP_MAX_MD_SIZE()))) {
                         parseResult = FALSE;
                         break;
                     }
@@ -2683,7 +2682,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 		stringToBinary(rtOpts->securityOpts.integrityAlgTypOIDString, rtOpts->securityOpts.integrityAlgTypOID, MAX_OID_LEN);
 
 		/* debugging print */
-        if (DM_MSGS) {
+        if (SEC_MSGS) {
             printf("the OID is: \n\t");
             for (int i = 0; i < 20; i++)
                 printf("0x%02x ", rtOpts->securityOpts.integrityAlgTypOID[i]);
@@ -2710,7 +2709,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
         }
 
 		/* debugging print */
-        if (DM_MSGS) {
+        if (SEC_MSGS) {
             switch (rtOpts->securityOpts.integrityAlgTyp) {
                 case GMAC_AES256:
                     printf("it's GMAC\n");
@@ -2728,7 +2727,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
     }
 
 	/* debugging prints */
-    if (DM_MSGS) {
+    if (SEC_MSGS) {
         if (rtOpts->securityOpts.delayed) {
 			printf("the first key is (length: %d):\n\t", rtOpts->securityOpts.keyLen);
 			for (int i = 0; i < 32; i++) {

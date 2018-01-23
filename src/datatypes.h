@@ -398,10 +398,6 @@ typedef struct {
 
 	/* list of Buffers, one for each time interval; a Buffer holds any number of BufferedMsgs */
 	Buffer **buffers;
-
-	/*  */
-	Boolean paranoid;
-
 } SecurityDS;
 #endif /* PTPD_SECURITY */
 

@@ -2,7 +2,7 @@
 // Created by iol on 5/19/17.
 //
 
-#include "dm_security.h"
+#include "security.h"
 #include <openssl/hmac.h> /* includes HMAC and EVP_sha256() */
 //#include <openssl/evp.h> /* this has EVP_sha256() only */
 
@@ -81,25 +81,31 @@ void generate_icv_key(unsigned char *result, unsigned char *key, int key_len) {
 /*
  * just call the actual openssl version
  */
-void *dm_EVP_sha256() {
+void *ptpd_EVP_sha256() {
     return (void *)EVP_sha256();
+}
+
+size_t ptpd_EVP_MAX_MD_SIZE() {
+    return EVP_MAX_MD_SIZE;
 }
 
 /*
  * call the openssl version, and now that we have the openssl structs w/ no
  * conflicts, can cast the evp_md from void* to EVP_MD *
  */
-unsigned char *dm_HMAC(void *evp_md, const void *key,
+unsigned char *ptpd_HMAC(void *evp_md, const void *key,
                        int key_len, const unsigned char *d, int n,
                        unsigned char *md, unsigned int *md_len) {
     return HMAC((EVP_MD *)evp_md, key, key_len, d, n, md, md_len);
 }
 
+
+
 /*
  * this code is adopted from Jeffrey Walton https://pastebin.com/v3J93Cj4
  * return
  */
-int dm_GMAC(const unsigned char *key,
+int GMAC(const unsigned char *key,
             unsigned char *iv, int iv_len,
             unsigned char *data, int data_len,
             unsigned char *icv, int icv_len) {

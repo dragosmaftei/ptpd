@@ -38,11 +38,31 @@ int initBuffers(Buffer **buffers, int n) {
 }
 
 void freeBuffer(Buffer *b) {
+    if (!b) {
+        return;
+    }
+    /* first free the BufferedMsgs */
+    BufferedMsg *cur = b->head;
+    while (cur) {
+        BufferedMsg *next = cur->next;
+        /* free the BufferedMsg */
+        free(cur->msg);
+        free(cur);
+        cur = next;
+    }
 
+    /* finally, free the Buffer */
+    free(b);
 }
 
 void freeBuffers(Buffer **buffers, int n) {
+    /* free each Buffer first */
+    for (int i = 0; i < n; i++) {
+        freeBuffer(buffers[i]);
+    }
 
+    /* finally, free the n Buffer pointers */
+    free(buffers);
 }
 
 /* adds message m of length len to the Buffer b (already initialized) */
@@ -131,7 +151,7 @@ void dumpBufferedMsg(BufferedMsg *bm) {
     char lastICVByte = bm->msg[header.messageLength - 1];
 
 
-    INFO("type: %s (seqid %04x) w/ ICV: %02x...%02x\n",
-         messageTypeString, header.sequenceId, firstICVByte, lastICVByte);
+    INFO("type: %s (seqid %04x) w/ ICV: %02x...%02x verified? %d\n",
+         messageTypeString, header.sequenceId, firstICVByte, lastICVByte, !bm->icvFailed);
 
 }

@@ -19,7 +19,7 @@
 #define PTPD_H_
 
 
-#define DM_MSGS 1
+#define SEC_MSGS 1 /* security related messages */
 /* this is to easily turn on code highlighting for PTPD_SECURITY blocks, should be turned off before compiling */
 #define DEFINE_SECURITY 0
 
@@ -177,7 +177,7 @@
 #include "datatypes.h"
 
 #ifdef PTPD_SECURITY
-#include "dm_security.h"
+#include "security.h"
 #include "sec_buffers.h"
 #endif /* PTPD_SECURITY */
 

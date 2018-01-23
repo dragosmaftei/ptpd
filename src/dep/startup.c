@@ -569,6 +569,29 @@ writeLockFile(RunTimeOpts * rtOpts)
 
 }
 
+#ifdef PTPD_SECURITY
+void
+freeSecurityOpts(SecurityOpts *secOpts)
+{
+    /* delayed processing requires freeing multiple things */
+    if (secOpts->delayed) {
+        INFO("SEC: delayed... freeing the keychain...\n");
+		/* master's keychain from startup; +1 to account for trust anchor */
+		for (int i = 0; i < secOpts->chainLength + 1; i++) {
+			free(secOpts->keyChain[i]);
+		}
+		free(secOpts->keyChain);
+	}
+    /* immediate processing, only thing to free should be the key */
+    else {
+        if (secOpts->key) {
+            INFO("SEC: freeing the key...\n");
+            free(secOpts->key);
+        }
+    }
+}
+#endif /* PTPD_SECURITY */
+
 void
 ptpdShutdown(PtpClock * ptpClock)
 {
@@ -594,8 +617,19 @@ ptpdShutdown(PtpClock * ptpClock)
 	freeSignalingTLV(&ptpClock->outgoingSignalingTmp);
 
 #ifdef PTPD_SECURITY
-    INFO("DM: Shutting down, freeing security related memory...\n");
-    freeSecurityOpts(&rtOpts.securityOpts);
+    INFO("SEC: Shutting down, freeing security related memory...\n");
+    if (rtOpts.securityOpts.delayed) {
+		INFO("SEC: delayed... freeing the buffers...\n");
+		freeBuffers(ptpClock->securityDS.buffers, rtOpts.securityOpts.chainLength);
+
+		INFO("SEC: delayed... freeing the verified keys...\n");
+		/* free verified keys, + 1 to account for trust anchor slot */
+		for (int i = 0; i < rtOpts.securityOpts.chainLength + 1; i++) {
+			free(ptpClock->securityDS.verifiedKeys[i]);
+		}
+		free(ptpClock->securityDS.verifiedKeys);
+	}
+	freeSecurityOpts(&rtOpts.securityOpts);
 #endif /* PTPD_SECURITY */
 
 #ifdef PTPD_SNMP
@@ -928,7 +962,6 @@ configcheck:
      * now that we have rtOpts, we can initialize the security dataset
      * for delayed processing: buffers, verifiedKeys chain, etc..., based on number of intervals
      */
-	//DM:TODO should this dataset init be factored into a separate function? where should the function live? its prototype?
 	SecurityDS *secDS = &ptpClock->securityDS;
 	SecurityOpts *secOpts = &rtOpts->securityOpts;
 
@@ -943,10 +976,9 @@ configcheck:
             free(ptpClock);
             goto fail;
         } else {
-            //DM:TODO should we allocate EVP_MAX_MD_SIZE for keys, isntead of keyLen? have wrapper function for this?
-            /* allocate memory for all the keys in the chain */
+            /* allocate memory for all the keys in the chain; use EVP_MAX_MD_SIZE instead of keyLen */
             for (i = 0; i < secOpts->chainLength + 1; i++) {
-                if (!(secDS->verifiedKeys[i] = calloc(1, secOpts->keyLen))) {
+                if (!(secDS->verifiedKeys[i] = calloc(1, ptpd_EVP_MAX_MD_SIZE()))) {
                     PERROR("failed to allocate memory for delayed security processing verified keys");
                     *ret = 2;
                     free(ptpClock);

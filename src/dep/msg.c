@@ -1785,8 +1785,8 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
 
         /* if exhausted the keychain, return 0, don't add TLV anymore */
         if (currentInterval >= secOpts->chainLength) {
-            if (DM_MSGS)
-                INFO("DM: outside time period (interval %d), not adding TLV\n", currentInterval);
+            if (SEC_MSGS)
+                INFO("SEC: outside time period (interval %d), not adding TLV\n", currentInterval);
             return 0;
         }
 
@@ -1845,14 +1845,14 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
         /* this disclosed key is right from the keychain, NOT the generated ICV key */
         unsigned char *disclosedKey = secOpts->keyChain[discKeyIndex];
 
-        /* DM:TODO debug printing the disclosed key*/
+        /* SEC:TODO debug printing the disclosed key*/
         unsigned char tmpBuf[256];
         memset(tmpBuf, 0, sizeof(tmpBuf));
         memcpy(tmpBuf, disclosedKey, secOpts->keyLen);
         tmpBuf[secOpts->keyLen] = '\0';
-        INFO("DM: currentInterval: %d, disclosing keyChain[%d] from interval %d: %02x...%02x\n",
+        INFO("SEC: currentInterval: %d, disclosing keyChain[%d] from interval %d: %02x...%02x\n",
              currentInterval, discKeyIndex, discKeyInterval, tmpBuf[0], tmpBuf[secOpts->keyLen - 1]);
-        /* DM:TODO end debug printing the disclosed key */
+        /* SEC:TODO end debug printing the disclosed key */
 
         /* add disclosed key at 10th byte offset */
         memcpy(buf + msg_len + SEC_TLV_CONSTANT_LEN, disclosedKey, secOpts->keyLen);
@@ -1875,7 +1875,7 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
     /* for immediate, just use the one key */
     unsigned char *key = secOpts->key;
 
-    // DM:TODO verify this works
+    // SEC:TODO verify this works
     if (secOpts->delayed) {
         unsigned char ICVKey[MAX_SEC_KEY_LEN];
         memset(ICVKey, 0, MAX_SEC_KEY_LEN);
@@ -1926,7 +1926,7 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
              * calculating it this way accounts for different alg types, as well as for the disclosed key, if present,
              * if doing delayed processing
              */
-            static_digest = dm_HMAC(dm_EVP_sha256(), key, secOpts->keyLen,
+            static_digest = ptpd_HMAC(ptpd_EVP_sha256(), key, secOpts->keyLen,
                                     buf, icvOffset, NULL, NULL);
 
             /* truncate the digest to 128 bits and pack it by copying just 16 bytes directly into the buffer */
@@ -1948,11 +1948,11 @@ void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteg
             if (fclose(fd))
                 ERROR("fclose() failed!\n");
 
-            /* call dm_GMAC passing in key, iv, ivlen, data (start of ptp header),
+            /* call GMAC passing in key, iv, ivlen, data (start of ptp header),
              * data len (icvOffset minus IV len, don't want to include IV in the integrity calculation)
              * icv start / where to place the calculated icv, and icv len
              */
-            if (!dm_GMAC(key, iv, sizeof(iv), buf, icvOffset - sizeof(iv),
+            if (!GMAC(key, iv, sizeof(iv), buf, icvOffset - sizeof(iv),
                          buf + icvOffset, secOpts->icvLength)) {
                 ERROR("Error calculating GMAC in calculateAndPackICV\n");
             }
@@ -1984,7 +1984,7 @@ Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, U
              * calculating it this way accounts for different alg types, as well as for the disclosed key, if present,
              * if doing delayed processing
              */
-            static_digest = dm_HMAC(dm_EVP_sha256(), key, secOpts->keyLen,
+            static_digest = ptpd_HMAC(ptpd_EVP_sha256(), key, secOpts->keyLen,
                                     buf, icvOffset, NULL, NULL);
 
             /*
@@ -2001,11 +2001,11 @@ Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, U
             unsigned char localICV[secOpts->icvLength];
             memset(localICV, 0, sizeof(localICV));
 
-            /* call dm_GMAC passing in key, iv from received msg, ivlen,
+            /* call GMAC passing in key, iv from received msg, ivlen,
              * data (start of ptp header), data len (not including ICV OR IV)
              * output (local buffer created to store this calculation) and icv len
              */
-            if (!dm_GMAC(key, buf + icvOffset - GMAC_IV_LEN, GMAC_IV_LEN,
+            if (!GMAC(key, buf + icvOffset - GMAC_IV_LEN, GMAC_IV_LEN,
                          buf, icvOffset - GMAC_IV_LEN,
                          localICV, secOpts->icvLength)) {
                 ERROR("Error calculating GMAC in ICV verification\n");
@@ -2022,26 +2022,6 @@ Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, U
             return FALSE;
     }
     return TRUE;
-}
-
-void
-freeSecurityOpts(SecurityOpts *secOpts)
-{
-    /* delayed processing requires freeing multiple things */
-    if (secOpts->delayed) {
-        /* DM:TODO free the key / keychain */
-        INFO("DM: delayed... freeing the keychain...\n");
-
-        /* DM:TODO free the message buffers */
-        INFO("DM: delayed... freeing the message buffers...\n");
-    }
-    /* immediate processing, only thing to free should be the key */
-    else {
-        if (secOpts->key) {
-            INFO("DM: freeing the key...\n");
-            free(secOpts->key);
-        }
-    }
 }
 
 #endif /* PTPD_SECURITY */
