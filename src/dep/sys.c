@@ -1379,15 +1379,20 @@ else {
 			(unsigned long)ptpClock->counters.icvMismatchErrors);
 
 	/* delayed processing counters */
-	fprintf(out, 		STATUSPREFIX"  %lu\n","safePackets",
-			(unsigned long)ptpClock->counters.safePackets);
-	fprintf(out, 		STATUSPREFIX"  %lu\n","unsafePackets",
-			(unsigned long)ptpClock->counters.unsafePackets);
-	fprintf(out, 		STATUSPREFIX"  %lu\n","keyVerificationSuccesses",
-			(unsigned long)ptpClock->counters.keyVerificationSuccesses);
-	fprintf(out, 		STATUSPREFIX"  %lu\n","keyVerificationFails",
-			(unsigned long)ptpClock->counters.keyVerificationFails);
-
+	if (rtOpts->securityOpts.delayed) {
+		fprintf(out, STATUSPREFIX"  %lu\n", "safePackets",
+				(unsigned long) ptpClock->counters.safePackets);
+		fprintf(out, STATUSPREFIX"  %lu\n", "unsafePackets",
+				(unsigned long) ptpClock->counters.unsafePackets);
+		fprintf(out, STATUSPREFIX"  %lu\n", "keyVerificationSuccesses",
+				(unsigned long) ptpClock->counters.keyVerificationSuccesses);
+		fprintf(out, STATUSPREFIX"  %lu\n", "keyVerificationFails",
+				(unsigned long) ptpClock->counters.keyVerificationFails);
+		fprintf(out, STATUSPREFIX"  %lu\n", "unsecureMsgsSentBeforeTime",
+				(unsigned long) ptpClock->counters.unsecureMsgsSentBeforeTime);
+		fprintf(out, STATUSPREFIX"  %lu\n", "unsecureMsgsSentAfterTime",
+				(unsigned long) ptpClock->counters.unsecureMsgsSentAfterTime);
+	}
 #endif /* PTPD_SECURITY */
 
 	fflush(out);

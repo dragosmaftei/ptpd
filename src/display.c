@@ -989,7 +989,21 @@ displayCounters(const PtpClock * ptpClock)
          (unsigned long)ptpClock->counters.keyIDMismatchErrors);
 	INFO("           icvMismatchErrors : %lu\n",
 		 (unsigned long)ptpClock->counters.icvMismatchErrors);
-
+	/* delayed processing counters */
+	if (ptpClock->rtOpts->securityOpts.delayed) {
+		INFO("           safePackets : %lu\n",
+			 (unsigned long)ptpClock->counters.safePackets);
+		INFO("           unsafePackets : %lu\n",
+			 (unsigned long)ptpClock->counters.unsafePackets);
+		INFO("           keyVerificationSuccesses : %lu\n",
+			 (unsigned long)ptpClock->counters.keyVerificationSuccesses);
+		INFO("           keyVerificationFails : %lu\n",
+			 (unsigned long)ptpClock->counters.keyVerificationFails);
+		INFO("           unsecureMsgsSentBeforeTime : %lu\n",
+			 (unsigned long)ptpClock->counters.unsecureMsgsSentBeforeTime);
+		INFO("           unsecureMsgsSentAfterTime : %lu\n",
+			 (unsigned long)ptpClock->counters.unsecureMsgsSentAfterTime);
+	}
 
 
 #ifdef RUNTIME_DEBUG

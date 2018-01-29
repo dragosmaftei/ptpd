@@ -1515,9 +1515,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
              * to get the actual total TLV length, we just pull down the length stored in the SA / securityOpts (constant
      		 * fields + ICV length), and account for the disclosed key if applicable (signalled by the disclosedKey bit
      		 * in the received TLV's secParamIndicator field); this calculated length based on the security parameters
-     		 * from our SA should match lengthField of incoming TLV
+     		 * from our SA should match lengthField stored in the incoming TLV
              */
-
 			UInteger16 secTLVLen = secOpts->secTLVLen;
 
 			/* if delayed processing, check SPI for flag indicating the presence of the disclosed key */
@@ -1547,7 +1546,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			/*
 			 * now verify (only for immediate) that the keyID from our "SA" (i.e. config file in this emulation)
 			 * is the same as the incoming message's TLV's keyID field;
-			 * if delayed, keyID has different meaning; it signals the current key's time interval
+			 * if delayed, keyID has different meaning; it signals the current message's time interval, and thus doesn't
+			 * need to be checked / cross-referenced with any of our stored info
 			 */
 			if (!secOpts->delayed && secOpts->keyID != sec_tlv.keyID) {
 				ptpClock->counters.securityErrors++;
@@ -1561,7 +1561,6 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
              * REPLAY ATTACK CHECK
              */
 
-
 			/*
 			 * save correction field and zero it out if doing immediate and ignoring correction field
              * if delayed processing, this will be done later, when verifying previously buffered messages
@@ -1574,9 +1573,6 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				memset(ptpClock->msgIbuf + 8, 0, 8); /* zero out the correction field */
 			}
 
-			/* for immediate, just use the one key */
-			unsigned char *key = secOpts->key;
-
 			/*
 			 * delayed processing case steps RFC4082 3.5:
 			 * 1. safe packet test, 2. new key index test, 3. key verification tests, 4. message verification tests
@@ -1585,7 +1581,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				/*
 				 * safe packet test
 				 * - record the result in safePacket / unsafePacket counters
-				 * - if safe, buffer the message; if unsafe, return?
+				 * - if safe, continue (and possibly buffer later, after passing other potential checks)
 				 * need to pass timeStamp, packet interval (keyID field), discDelay, D_t, T_0, T_int (secOpts)
 				 */
 				if (isSafePacket(timeStamp, sec_tlv.keyID, secOpts)) {
@@ -1627,7 +1623,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 						/* disclosed key is at TLV offset 10 */
 						unsigned char *discKey = (unsigned char *)ptpClock->msgIbuf + packetLength + 10;
 
-						/* pass verifiedKeys, new key, latest index, new index, keychain len, key len */
+						/* pass verifiedKeys, new key, new interval, latest interval, keychain len, key len */
 						if (verify_key(ptpClock->securityDS.verifiedKeys, discKey,
 								   discKeyInterval, ptpClock->securityDS.latestInterval,
 								   secOpts->chainLength, secOpts->keyLen)) {
@@ -1644,8 +1640,9 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                             for (; numUnverifiedBuffers > 0; numUnverifiedBuffers--) {
                                 /*
                                  * if there's only 1 unverified buffer (most common case), then the buffer here will be
-                                 * the one corresponding to the discKeyInterval; otherwise, this will start with the
-                                 * unverified buffer and work towards the latest one (corresponding to discKeyInterval)
+                                 * the one corresponding to the discKeyInterval;
+                                 * otherwise, this will start with the oldest unverified buffer and work towards the
+                                 * latest one (which still corresponds to discKeyInterval)
                                  */
                                 Integer16 targetInterval = discKeyInterval - numUnverifiedBuffers + 1;
                                 Buffer *targetBuffer = ptpClock->securityDS.buffers[targetInterval];
@@ -1670,7 +1667,6 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                                     int targetKeyIndex = secOpts->chainLength - 1 - targetInterval;
                                     /* generate icv key using keychain key, hashing over 1; result is placed in 1st arg */
                                     generate_icv_key(ICVKey, ptpClock->securityDS.verifiedKeys[targetKeyIndex], secOpts->keyLen);
-                                    key = ICVKey;
 
                                     /*
                                     * 3. calculate and verify ICV, passing in secOpts, buffer, icvOffset, and key
@@ -1679,12 +1675,12 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                                     if (calculateAndVerifyICV(secOpts,
                                                               (unsigned char *) tmpBuf,
                                                               cur->len - secOpts->icvLength,
-                                                              key) == FALSE) {
+                                                              ICVKey) == FALSE) {
                                         ptpClock->counters.securityErrors++;
                                         ptpClock->counters.icvMismatchErrors++;
                                         if (SEC_MSGS)
-                                            INFO("SEC: icv's DIDNT MATCH on seqid %04x\n",
-                                                 ptpClock->msgTmpHeader.sequenceId);
+                                            INFO("SEC: icv's DIDNT MATCH on seqid %04x from interval/buffer %x\n",
+                                                 ptpClock->msgTmpHeader.sequenceId, targetInterval);
 
                                         /* 4. mark the BufferedMsg as having failed icv check */
                                         cur->icvFailed = TRUE;
@@ -1719,7 +1715,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                  * packet is safe; already addressed disclosed key if present by checking if it's new, verifying it,
                  * and using it to check previously buffered messages
                  * now, buffer current message into the buffer corresponding to the current interval
-                 * pass packet length including the security TLV; packetlength + sectlvlength, or packetlength from header?
+                 * pass packet length including the security TLV; this should be messageLength field from header
                  */
                 if (!(bufferMessage(ptpClock->securityDS.buffers[sec_tlv.keyID], ptpClock->msgIbuf,
                               ptpClock->msgTmpHeader.messageLength))) {
@@ -1763,8 +1759,6 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                 INFO("buffering msg into buff %d, type: %s (seqid %04x) w/ ICV: %02x...%02x\n",
                      sec_tlv.keyID, messageTypeString, ptpClock->msgTmpHeader.sequenceId,
                      firstICVByte, lastICVByte);
-
-
                 /********************************* end debug info ****************************************/
 
 			}
@@ -1773,7 +1767,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
              * returns false if verification fails, otherwise proceed
              */
 			else if (calculateAndVerifyICV(secOpts, (unsigned char *)ptpClock->msgIbuf,
-								  packetLength + secTLVLen - secOpts->icvLength, key) == FALSE) {
+								  packetLength + secTLVLen - secOpts->icvLength, secOpts->key) == FALSE) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.icvMismatchErrors++;
 				if (SEC_MSGS)
@@ -3538,20 +3532,16 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
     interval = interval % rtOpts->securityOpts.chainLength;
     INFO("SEC: current interval: %d\n", interval);
 
-
 	/*
      * 'securityEnabled' emulates getting the policy limiting fields from the PTP header and querying the SPD to
      * answer the question 'do we want security processing on this packet?' if yes, the query would return an SPP
      * which would be used to query the SAD to get the relevant SA, which contains necessary security parameters
+     *
+     * 2nd condition !(delayed && slave) is an ugly workaround (in the absence of an actual SPD lookup) to make a slave
+     * using delayed proc. NOT add TLV
+     * in an actual solution, a slave's SPD lookup based on policy limiting fields would return 0, or the SPP
+     * for an SA for immediate processing, and so no TLV would be added for a slave using delayed processing
      */
-
-	/*
-    * 2nd condition !(delayed && slave) is an ugly workaround (in the absence of an actual SPD lookup) to make a slave
-    * using delayed proc. NOT add TLV
-    * in an actual solution, a slave's SPD lookup based on policy limiting fields would return 0, or the SPP
-    * for an SA for immediate processing
-    */
-
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
         /* add security TLV, returns size, add it to length of the packet to send */

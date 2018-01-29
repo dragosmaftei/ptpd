@@ -93,14 +93,20 @@ typedef struct
     /* length field from incoming message's TLV didn't match calculated length based on our security parameters */
 	uint32_t lengthMismatchErrors;
 	uint32_t SPPMismatchErrors; /* SPP from incoming message's TLV didn't match SPP from SPD query */
-    uint32_t keyIDMismatchErrors; /* keyID from incoming message's TLV didn't match keyID from our "SA" */
+    uint32_t keyIDMismatchErrors; /* for immediate, keyID from incoming message's TLV didn't match keyID from our "SA" */
     uint32_t icvMismatchErrors; /* failed icv verification; icvs didn't match */
 
-    /* delayed processing counters, TODO only added to writeStatusFile atm */
+    /* informational counters for delayed processing TODO only added to writeStatusFile atm */
     uint32_t safePackets;
     uint32_t unsafePackets;
     uint32_t keyVerificationSuccesses;
     uint32_t keyVerificationFails;
+    /*
+     * counters for messages sent by master before the start time, and for messages sent after the keychain is exhausted
+     * i.e. after the last time interval; such messages do not have security TLVs added
+     */
+    uint32_t unsecureMsgsSentBeforeTime;
+    uint32_t unsecureMsgsSentAfterTime;
 
 #endif /* PTPD_SECURITY */
 
@@ -250,18 +256,18 @@ typedef enum IntegrityAlgTyp {
  */
 typedef struct {
  	/*
-     * length of overall securityTLV (including Type and Length i.e. payload + 4
-     * this is the length of the TLV constant fields (10) + ICV length + optional fields i.e. disclosedKey
+     * length of overall securityTLV (including Type and Length i.e. payload + 4)
+     * this is the length of the TLV constant fields (10) + ICV length
      */
 	UInteger16 secTLVLen;
 
-    /* security parameter pointer; enables querying the SAD for the relevant SA */
+    /* security parameter pointer; enables querying the SAD for the relevant SA (unused in this emulation) */
     UInteger8 SPP;
     char SPPString[1 * 2 + 1]; // size of SPP (1 byte) * 2 + 1 for null
 
     /*
-     * if immediate/GDOI: supposed to identify the value of the currently used key (how...? unused)
-     * if delayed/TESLA: specifies the time interval (and thus, in a way, the key used to protect) for the current message
+     * if immediate/GDOI: supposed to identify the value of the currently used key (how...? unused in this emulation)
+     * if delayed/TESLA: specifies the time interval (and thus, indirectly, the key used to protect) for the current message
      */
     UInteger32 keyID;
     char keyIDString[4 * 2 + 1]; // size of keyID (4) * 2 + 1 for null
@@ -271,8 +277,8 @@ typedef struct {
 
     /*
      * if immediate, this is the key, will be mallocd at start up;
-     * if delayed, this is the current key in the keychain; needs to be pointer, not array, so that for delayed,
-     * it can be reassigned as needed to different keys in the keychain TODO not true, shouldn't reassign anyway, const rtOpts
+     * if delayed, this will point to the origin key that all other keys in the keychain will be hashed from, but this
+     * pointer itself won't be used as it will be stored in keyChain[0]
 	 */
 	unsigned char *key;
 	/*
@@ -280,12 +286,6 @@ typedef struct {
 	 * 32 bytes, need 64 chars and +1 for null byte
 	 */
 	char keyString[MAX_SEC_KEY_LEN * 2 + 1];
-
-    /*
-     * disclosedKey (optional), only for delayed
-     * sequenceNo (optional), not used
-     * reserved (optional), not used
-     */
 
     /*
      * IntegrityAlgTyp;
@@ -318,14 +318,7 @@ typedef struct {
      * d = ceil(2m / T_int) + 1
      */
 
-    /*
-     * T_int: the interval duration (s)
-     * uint16 supports 65536 values, in ms this gives ~1 minute, may not be long enough for some applications
-     * uint32 supports 4294967296 values, in ms this gives us ~49 days; with a minimum disclosure delay of 1 interval,
-     * this means a new key would be disclosed every 49 days... if someone wants to set the interval duration for longer
-     * than this you have other problems to consider
-     */
-	//UInteger32 intervalDuration;
+    /* T_int: the interval duration (s) */
 	double intervalDuration;
 
     /*
@@ -340,7 +333,6 @@ typedef struct {
      * this inputted start time (as seconds held in an int32) will be read into the seconds (Integer32) member
      * of the TimeInternal structure;
      */
-    //UInteger32 startTime;
     TimeInternal startTime;
 
     /* N: the length of the one-way chain (also, the number of intervals) */
@@ -354,7 +346,12 @@ typedef struct {
      */
     double D_t;
 
-    /*  */
+    /*
+     * the one-way key chain of size chainLength + 1, holds a key for every interval, plus one last extra key - the
+     * 'trust anchor' - which is supposed to be distributed to all the slaves as part of a bootstrapping phase
+     * the key provided in the config file will be used as K_N (see below), and from it, the rest of the keys will be
+     * generated via a hash algorithm
+     */
     unsigned char **keyChain;
 
     /*
@@ -390,7 +387,7 @@ typedef struct {
  * dataset for security variables
  */
 typedef struct {
-	/*************** delayed processing data ****************************/
+	/* =================== delayed processing data ========================= */
 	/* keychain for verified keys for use by slave in delayed processing */
 	unsigned char **verifiedKeys;
 	/* specifies the latest interval for which a slave has a verified key */

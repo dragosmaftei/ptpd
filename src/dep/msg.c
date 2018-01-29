@@ -1738,26 +1738,23 @@ void msgPackSecurityTLV(SecurityTLV *data, Octet *buf)
 }
 
 /*
+ * this gets called in issue<messageType> functions, after the buffer has been packed (including header)
  * - buf is the output buffer (PTP header start)
- * - Boolean msgClassGeneral (as in, message type, as opposed to event) is used for delayed security processing to
+ * - Boolean msgClassGeneral (as in, message type, general vs. event) is used for delayed security processing to
  * decide whether to consider including a disclosed key in this message (should not disclose key in event messages)
- * this should be called after the buffer has been packed (including header) for the type of message
+ * - return value is the length of the securityTLV that was added to the buffer
  */
 UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgClassGeneral)
 {
     /*
      * we've "used policy limiting fields to query the SPD" (i.e. in this emulation, just checked 'securityEnabled'),
-     * and the query "returned an SPP to query SAD to obtain the relevant SA which contains other security paramaters",
-     * (i.e. in this emulation, the parameters were read in from config file)... these parameters include:
-     * imm/delayed, keyID, key, keyLen, algType (and thus ICV length), total TLV length (variable based on ICV length)
-     * NOT including optional fields, and for delayed, a key disclosure delay;
-     * thus to get the actual total TLV length, we just pull down the length stored in the SA / securityOpts (constant
-     * fields + ICV length), and account for the disclosed key if applicable (signalled by the key disclosure delay)
-     */
+     * and the query "returned an SPP to query SAD to obtain the relevant SA which contains other security paramaters"
+     * (i.e. in this emulation, the parameters were read in from config file)
 
     /*
-     * only this is pulled down into a local variable (as opposed to being accessed through secOpts) since
-     * it might get adjusted for optional fields on a per message basis depending on the key disclosure
+     * only this secTLVLen (constant secTLV length + icv length) is pulled down into a local variable (as opposed to
+     * being accessed through secOpts) since it might get adjusted for optional fields on a per message basis depending
+     * on the key disclosure
      */
     UInteger16 secTLVLen = secOpts->secTLVLen;
 
@@ -1776,6 +1773,9 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
 
         /* if elapsed time is negative, we haven't reached the startTime yet, so just return 0, and no TLV is added */
         if (isTimeInternalNegative(&elapsed)) {
+            if (SEC_MSGS)
+                INFO("SEC: outside time period (haven't reached startTime yet), not adding TLV\n");
+            /* increment 'unsecureMsgsSentBeforeTime' counter if this gets reparameterized to give access to counters */
             return 0;
         }
 
@@ -1786,10 +1786,10 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
         /* if exhausted the keychain, return 0, don't add TLV anymore */
         if (currentInterval >= secOpts->chainLength) {
             if (SEC_MSGS)
-                INFO("SEC: outside time period (interval %d), not adding TLV\n", currentInterval);
+                INFO("SEC: outside time period (interval %d is after last interval), not adding TLV\n", currentInterval);
+            /* increment 'unsecureMsgsSentAfterTime' counter if this gets reparameterized to give access to counters */
             return 0;
         }
-
 
         /* disclose a key for messages from a previous interval only if:
          * - this is a general message (non-event message), AND
@@ -1819,7 +1819,6 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
     sec_tlv.lengthField = secTLVLen - 4; /* -4 to discount TYPE and LENGTH (2 bytes each) */
     sec_tlv.SPP = secOpts->SPP;
 
-
     /* for delayed, keyID field stores the current time interval */
     if (secOpts->delayed) {
         sec_tlv.keyID = currentInterval;
@@ -1834,7 +1833,7 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
 
     /*
      * pack the buffer with what we have so far for the TLV; avoiding the padding inherent in structs
-     * start at end of message (i.e. buf + msg_len)
+     * start at end of message, which is the start of the secTLV (i.e. buf + msg_len)
      */
     msgPackSecurityTLV(&sec_tlv, buf + msg_len);
 
@@ -1854,7 +1853,7 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
              currentInterval, discKeyIndex, discKeyInterval, tmpBuf[0], tmpBuf[secOpts->keyLen - 1]);
         /* SEC:TODO end debug printing the disclosed key */
 
-        /* add disclosed key at 10th byte offset */
+        /* add disclosed key at 10th byte offset (constant length fields = 10 bytes) */
         memcpy(buf + msg_len + SEC_TLV_CONSTANT_LEN, disclosedKey, secOpts->keyLen);
     }
 
@@ -1906,10 +1905,10 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
 }
 
 /*
- *
  * buf is the start of the PTP header
  * need secOpts for algTyp, keyLen, icvLength, and key... for delayed, key changes based on time interval, and we
- * can't change the secOpts->key pointer (due to rtOpts being const back in issue<msgtype>) so a pointer needs to be passed in
+ * can't change the secOpts->key pointer (due to rtOpts being const back in issue<msgtype>) so a separate pointer
+ * needs to be passed in
  */
 void calculateAndPackICV(const SecurityOpts *secOpts, unsigned char *buf, UInteger16 icvOffset, unsigned char *key) {
 
