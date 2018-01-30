@@ -839,6 +839,8 @@ stringToBinary(char *valueString, unsigned char *value, int maxLen)
         char first, second;
         first = tohex(valueString[i * 2]);
         second = tohex(valueString[i * 2 + 1]);
+
+		//SEC:TODO remove debug msg
         if (SEC_MSGS) printf("i: %d, first: 0x%01x, second: 0x%01x\n", i, first, second);
 
         if ((first == -1) || (second == -1)) {
@@ -2609,6 +2611,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
     /*
      * set various security related variables based on the input
      */
+    //SEC:TODO remove debug msgs
     if (SEC_MSGS) {
         printf("the keystring size is (should always be this): %lu\n", sizeof(rtOpts->securityOpts.keyString));
         printf("the keystring STRLEN is: %lu\n", strlen(rtOpts->securityOpts.keyString));
@@ -2681,6 +2684,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 
 		stringToBinary(rtOpts->securityOpts.integrityAlgTypOIDString, rtOpts->securityOpts.integrityAlgTypOID, MAX_OID_LEN);
 
+        //SEC:TODO remove debug msgs
 		/* debugging print */
         if (SEC_MSGS) {
             printf("the OID is: \n\t");
@@ -2708,6 +2712,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
             WARNING("The algorithm OID provided does not match; using HMAC as default\n");
         }
 
+        //SEC:TODO remove debug msgs
 		/* debugging print */
         if (SEC_MSGS) {
             switch (rtOpts->securityOpts.integrityAlgTyp) {
@@ -2722,10 +2727,9 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 
         rtOpts->securityOpts.SPP =  (UInteger8) strtoul(rtOpts->securityOpts.SPPString, 0, 16); // base 16
         rtOpts->securityOpts.keyID =  (UInteger32) strtoul(rtOpts->securityOpts.keyIDString, 0, 16); // base 16
-
-
     }
 
+    //SEC:TODO remove debug msgs
 	/* debugging prints */
     if (SEC_MSGS) {
         if (rtOpts->securityOpts.delayed) {

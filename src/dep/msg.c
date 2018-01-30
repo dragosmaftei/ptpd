@@ -1844,14 +1844,15 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
         /* this disclosed key is right from the keychain, NOT the generated ICV key */
         unsigned char *disclosedKey = secOpts->keyChain[discKeyIndex];
 
-        /* SEC:TODO debug printing the disclosed key*/
+        //SEC:TODO remove debug
+        /******* begin debug printing the disclosed key ********/
         unsigned char tmpBuf[256];
         memset(tmpBuf, 0, sizeof(tmpBuf));
         memcpy(tmpBuf, disclosedKey, secOpts->keyLen);
         tmpBuf[secOpts->keyLen] = '\0';
         INFO("SEC: currentInterval: %d, disclosing keyChain[%d] from interval %d: %02x...%02x\n",
              currentInterval, discKeyIndex, discKeyInterval, tmpBuf[0], tmpBuf[secOpts->keyLen - 1]);
-        /* SEC:TODO end debug printing the disclosed key */
+        /******* end debug printing the disclosed key ********/
 
         /* add disclosed key at 10th byte offset (constant length fields = 10 bytes) */
         memcpy(buf + msg_len + SEC_TLV_CONSTANT_LEN, disclosedKey, secOpts->keyLen);

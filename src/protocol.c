@@ -1695,6 +1695,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                                  * effects of any messages that failed the ICV check
                                  */
 
+								//SEC:TODO remove debug
                                 /*************************** debug buffer dump *****************************/
                                 INFO("SEC: verifying buffered messages in buffer %d...\n", targetInterval);
                                 dumpBuffer(ptpClock->securityDS.buffers[targetInterval], dumpBufferedMsg);
@@ -1725,6 +1726,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 					exit(1);
                 }
 
+				//SEC:TODO remove debug
                 /********************************* debuf info ****************************************/
                 /* debug info, buffering into buffer x, message type, seqid, icv first and last bytes */
                 char messageTypeString[25];
@@ -3507,30 +3509,6 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
 	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
 		if(SEC_MSGS) INFO("SEC: get start time in send sync failed\n");
 #endif /* RUNTIME_DEBUG */
-
-    // SEC:TODO remove these debugs
-    // debug trying to see what time is
-    TimeInternal myt;
-    getTime(&myt);
-    char tmpBuf[200];
-    memset(tmpBuf, 0, sizeof(tmpBuf));
-    snprint_TimeInternal(tmpBuf, sizeof(tmpBuf), &myt);
-    //INFO("SEC: time (TimeInternal) as string is: %s\n", tmpBuf);
-    //timeInternal_display(&myt); // this uses DBG which only works if all DBG levels are enabled... annoying
-    //INFO("SEC: time (TimeInternal) as double: %f\n", timeInternalToDouble(&myt)); works
-
-    // debug print elapsed time since startTime: result, x - y
-    TimeInternal elapsed;
-    memset(tmpBuf, 0, sizeof(tmpBuf));
-    subTime(&elapsed, &myt, &rtOpts->securityOpts.startTime);
-
-    snprint_TimeInternal(tmpBuf, sizeof(tmpBuf), &elapsed);
-    //INFO("SEC: cur time - start time is: %s\n", tmpBuf);
-
-    // debug printing the current time interval
-    int interval = timeInternalToDouble(&elapsed) / rtOpts->securityOpts.intervalDuration;
-    interval = interval % rtOpts->securityOpts.chainLength;
-    INFO("SEC: current interval: %d\n", interval);
 
 	/*
      * 'securityEnabled' emulates getting the policy limiting fields from the PTP header and querying the SPD to
