@@ -21,7 +21,7 @@
 
 #define SEC_MSGS 1 /* security related messages */
 /* this is to easily turn on code highlighting for PTPD_SECURITY blocks, should be turned off before compiling */
-#define DEFINE_SECURITY 1
+#define DEFINE_SECURITY 0
 
 #if DEFINE_SECURITY
 #define PTPD_SECURITY
