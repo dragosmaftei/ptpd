@@ -38,7 +38,7 @@ ptpd*.tar.gz
 /test/pp_master.conf
 /test/pp_slave.conf
 /test/test.conf
-/test/security_testing/
+#/test/security_testing/
 CMakeLists.txt
 cmake-build-debug/
 src/.libs/
