@@ -1750,6 +1750,7 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
      * we've "used policy limiting fields to query the SPD" (i.e. in this emulation, just checked 'securityEnabled'),
      * and the query "returned an SPP to query SAD to obtain the relevant SA which contains other security paramaters"
      * (i.e. in this emulation, the parameters were read in from config file)
+     */
 
     /*
      * only this secTLVLen (constant secTLV length + icv length) is pulled down into a local variable (as opposed to

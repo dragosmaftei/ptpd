@@ -840,9 +840,6 @@ stringToBinary(char *valueString, unsigned char *value, int maxLen)
         first = tohex(valueString[i * 2]);
         second = tohex(valueString[i * 2 + 1]);
 
-		//SEC:TODO remove debug msg
-        if (SEC_MSGS) printf("i: %d, first: 0x%01x, second: 0x%01x\n", i, first, second);
-
         if ((first == -1) || (second == -1)) {
             WARNING("Invalid hex character in specified input string %s; value will be zeroed out\n", valueString);
             memset(value, 0, maxLen);
@@ -1043,12 +1040,17 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 								"For delayed security processing, the start time of the first time interval.",
 								RANGECHECK_RANGE,0,INT_MAX);
 
-
     /* For delayed processing, the length of an interval (s); limits, min 1ms, 1 day max */
     parseResult &= configMapDouble(opCode, opArg, dict, target, "security:interval_duration", PTPD_RESTART_NONE,
                                    &rtOpts->securityOpts.intervalDuration, rtOpts->securityOpts.intervalDuration,
                                    "For delayed security processing, the length of an interval",
                                    RANGECHECK_RANGE, 0.001, 86400);
+
+	/* For delayed processing, the key disclosure delay in units of time intervals */
+	parseResult &= configMapInt(opCode, opArg, dict, target, "security:disclosure_delay", PTPD_RESTART_NONE, INTTYPE_U8,
+								&rtOpts->securityOpts.disclosureDelay, rtOpts->securityOpts.disclosureDelay,
+								"For delayed security processing, the key disclosure delay in units of time intervals.",
+								RANGECHECK_RANGE,1,UCHAR_MAX);
 
     /* For delayed processing, upper bound on network delay */
     parseResult &= configMapDouble(opCode, opArg, dict, target, "security:d_t", PTPD_RESTART_NONE,
@@ -1056,13 +1058,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
                                    "For delayed security processing, upper bound on network delay",
                                    RANGECHECK_RANGE, 0, 86400);
 
-    /* For delayed processing, the key disclosure delay in units of time intervals */
-    parseResult &= configMapInt(opCode, opArg, dict, target, "security:disclosure_delay", PTPD_RESTART_NONE, INTTYPE_U8,
-                                &rtOpts->securityOpts.disclosureDelay, rtOpts->securityOpts.disclosureDelay,
-                                "For delayed security processing, the key disclosure delay in units of time intervals.",
-                                RANGECHECK_RANGE,1,UCHAR_MAX);
-
-
+	/**************************** other security configuration settings ******************************************/
 
     /* when security is enabled and in master state, accept and process insecure messages (messages w/out security bit flipped) */
     parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:master_accept_insecure_announce", PTPD_RESTART_NONE,
@@ -2611,15 +2607,6 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
     /*
      * set various security related variables based on the input
      */
-    //SEC:TODO remove debug msgs
-    if (SEC_MSGS) {
-        printf("the keystring size is (should always be this): %lu\n", sizeof(rtOpts->securityOpts.keyString));
-        printf("the keystring STRLEN is: %lu\n", strlen(rtOpts->securityOpts.keyString));
-        printf("the keyString is:\n\t");
-        for (int i = 0; i < (sizeof(rtOpts->securityOpts.keyString)); i++)
-            printf("0x%02x ", rtOpts->securityOpts.keyString[i]);
-        printf("\n");
-    }
 
     if (rtOpts->securityEnabled) {
 
@@ -2684,17 +2671,6 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 
 		stringToBinary(rtOpts->securityOpts.integrityAlgTypOIDString, rtOpts->securityOpts.integrityAlgTypOID, MAX_OID_LEN);
 
-        //SEC:TODO remove debug msgs
-		/* debugging print */
-        if (SEC_MSGS) {
-            printf("the OID is: \n\t");
-            for (int i = 0; i < 20; i++)
-                printf("0x%02x ", rtOpts->securityOpts.integrityAlgTypOID[i]);
-            printf("\n");
-
-            printf("the OID size is: %d\n", rtOpts->securityOpts.integrityAlgTypOID[1] + 2);
-        }
-
         /* set integrityAlgTyp enum accordingly */
         if (memcmp(HMAC_SHA256_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(HMAC_SHA256_OID) - 1) == 0) {
             rtOpts->securityOpts.integrityAlgTyp = HMAC_SHA256;
@@ -2712,26 +2688,13 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
             WARNING("The algorithm OID provided does not match; using HMAC as default\n");
         }
 
-        //SEC:TODO remove debug msgs
-		/* debugging print */
-        if (SEC_MSGS) {
-            switch (rtOpts->securityOpts.integrityAlgTyp) {
-                case GMAC_AES256:
-                    printf("it's GMAC\n");
-                    break;
-                case HMAC_SHA256:
-                    printf("it's HMAC\n");
-                    break;
-            }
-        }
-
         rtOpts->securityOpts.SPP =  (UInteger8) strtoul(rtOpts->securityOpts.SPPString, 0, 16); // base 16
         rtOpts->securityOpts.keyID =  (UInteger32) strtoul(rtOpts->securityOpts.keyIDString, 0, 16); // base 16
     }
 
     //SEC:TODO remove debug msgs
 	/* debugging prints */
-    if (SEC_MSGS) {
+    if (rtOpts->securityEnabled && SEC_MSGS) {
         if (rtOpts->securityOpts.delayed) {
 			printf("the first key is (length: %d):\n\t", rtOpts->securityOpts.keyLen);
 			for (int i = 0; i < 32; i++) {
@@ -2758,15 +2721,6 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 			}
             printf("\n");
 		}
-
-		printf("SPP: %02x\nkeyid: %08x\n",
-               rtOpts->securityOpts.SPP, rtOpts->securityOpts.keyID);
-
-		/* debugging print start time */
-		char tmpBuf[200];
-		memset(tmpBuf, 0, sizeof(tmpBuf));
-		snprint_TimeInternal(tmpBuf, sizeof(tmpBuf), &rtOpts->securityOpts.startTime);
-		printf("startTime (TimeInternal) as string is: %s\n", tmpBuf);
     }
 
 #endif /* PTPD_SECURITY */
