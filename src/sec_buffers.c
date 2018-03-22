@@ -147,11 +147,11 @@ void dumpBufferedMsg(BufferedMsg *bm) {
             break;
     }
 
-    char firstICVByte = bm->msg[header.messageLength - GMAC_ICV_LEN]; // debugging.. but GMAC and HMAC have same ICV len
-    char lastICVByte = bm->msg[header.messageLength - 1];
+    /* unsigned char for cleaner printing */
+    unsigned char firstICVByte = (unsigned char) bm->msg[header.messageLength - GMAC_ICV_LEN]; // debugging.. but GMAC and HMAC have same ICV len
+    unsigned char lastICVByte = (unsigned char) bm->msg[header.messageLength - 1];
 
-
-    INFO("type: %s (seqid %04x) w/ ICV: %02x...%02x verified? %d\n",
-         messageTypeString, header.sequenceId, firstICVByte, lastICVByte, !bm->icvFailed);
+    INFO("SEC: \tmessage type: %s (seqid %04x), correction field (lsb): ...%08x, ICV: %02x...%02x verified? %d\n",
+         messageTypeString, header.sequenceId, header.correctionField.lsb, firstICVByte, lastICVByte, !bm->icvFailed);
 
 }

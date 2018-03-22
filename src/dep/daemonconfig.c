@@ -2692,37 +2692,6 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
         rtOpts->securityOpts.keyID =  (UInteger32) strtoul(rtOpts->securityOpts.keyIDString, 0, 16); // base 16
     }
 
-    //SEC:TODO remove debug msgs
-	/* debugging prints */
-    if (rtOpts->securityEnabled && SEC_MSGS) {
-        if (rtOpts->securityOpts.delayed) {
-			printf("the first key is (length: %d):\n\t", rtOpts->securityOpts.keyLen);
-			for (int i = 0; i < 32; i++) {
-				printf("%02x ", rtOpts->securityOpts.keyChain[0][i]);
-			}
-            printf("\n");
-
-            printf("the key is (length: %d):\n\t", rtOpts->securityOpts.keyLen);
-            for (int i = 0; i < 32; i++) {
-                printf("%02x ", rtOpts->securityOpts.key[i]);
-            }
-            printf("\n");
-
-            printf("the trust anchor is (length: %d):\n\t", rtOpts->securityOpts.keyLen);
-            for (int i = 0; i < 32; i++) {
-                printf("%02x ", rtOpts->securityOpts.trustAnchor[i]);
-            }
-            printf("\n");
-
-		} else {
-			printf("the key is (length: %d):\n\t", rtOpts->securityOpts.keyLen);
-			for (int i = 0; i < 32; i++) {
-				printf("%02x ", rtOpts->securityOpts.key[i]);
-			}
-            printf("\n");
-		}
-    }
-
 #endif /* PTPD_SECURITY */
     
 

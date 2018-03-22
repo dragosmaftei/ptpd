@@ -1739,13 +1739,15 @@ void msgPackSecurityTLV(SecurityTLV *data, Octet *buf)
 
 /*
  * this gets called in issue<messageType> functions, after the buffer has been packed (including header)
- * - buf is the output buffer (PTP header start)
  * - Boolean msgClassGeneral (as in, message type, general vs. event) is used for delayed security processing to
  * decide whether to consider including a disclosed key in this message (should not disclose key in event messages)
  * - return value is the length of the securityTLV that was added to the buffer
  */
-UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgClassGeneral)
+UInteger16 addSecurityTLV(PtpClock *ptpClock, const SecurityOpts *secOpts, Boolean msgClassGeneral)
 {
+    /* output buffer (PTP header start) */
+    Octet *buf = ptpClock->msgObuf;
+
     /*
      * we've "used policy limiting fields to query the SPD" (i.e. in this emulation, just checked 'securityEnabled'),
      * and the query "returned an SPP to query SAD to obtain the relevant SA which contains other security paramaters"
@@ -1776,7 +1778,8 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
         if (isTimeInternalNegative(&elapsed)) {
             if (SEC_MSGS)
                 INFO("SEC: outside time period (haven't reached startTime yet), not adding TLV\n");
-            /* increment 'unsecureMsgsSentBeforeTime' counter if this gets reparameterized to give access to counters */
+            /* informational counter */
+            ptpClock->counters.unsecureMsgsSentBeforeTime++;
             return 0;
         }
 
@@ -1788,7 +1791,8 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
         if (currentInterval >= secOpts->chainLength) {
             if (SEC_MSGS)
                 INFO("SEC: outside time period (interval %d is after last interval), not adding TLV\n", currentInterval);
-            /* increment 'unsecureMsgsSentAfterTime' counter if this gets reparameterized to give access to counters */
+            /* informational counter */
+            ptpClock->counters.unsecureMsgsSentAfterTime++;
             return 0;
         }
 
@@ -1847,12 +1851,14 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
 
         //SEC:TODO remove debug
         /******* begin debug printing the disclosed key ********/
+        /*
         unsigned char tmpBuf[256];
         memset(tmpBuf, 0, sizeof(tmpBuf));
         memcpy(tmpBuf, disclosedKey, secOpts->keyLen);
         tmpBuf[secOpts->keyLen] = '\0';
         INFO("SEC: currentInterval: %d, disclosing keyChain[%d] from interval %d: %02x...%02x\n",
              currentInterval, discKeyIndex, discKeyInterval, tmpBuf[0], tmpBuf[secOpts->keyLen - 1]);
+        */
         /******* end debug printing the disclosed key ********/
 
         /* add disclosed key at 10th byte offset (constant length fields = 10 bytes) */
@@ -1876,7 +1882,7 @@ UInteger16 addSecurityTLV(Octet *buf, const SecurityOpts *secOpts, Boolean msgCl
     /* for immediate, just use the one key */
     unsigned char *key = secOpts->key;
 
-    // SEC:TODO verify this works
+    /* for delayed, generate ICV key from the keychain key before calculating ICV */
     if (secOpts->delayed) {
         unsigned char ICVKey[MAX_SEC_KEY_LEN];
         memset(ICVKey, 0, MAX_SEC_KEY_LEN);

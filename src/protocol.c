@@ -1366,8 +1366,6 @@ Boolean isSafePacket(TimeInternal *recvTime, UInteger32 i, SecurityOpts *secOpts
 	 */
 	UInteger16 x = (t_j - T_0) / secOpts->intervalDuration;
 
-    //SEC:TODO remove debug
-    //INFO("SEC: safe packet test x < i + d: %d < %d + %d\n", x, i, secOpts->disclosureDelay);
 	/*
 	 * verify that x < i + d (where i is the interval index), which implies that the sender is not yet in the
 	 * interval during which it discloses the key K_i.
@@ -1582,15 +1580,17 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				 * safe packet test
 				 * - record the result in safePacket / unsafePacket counters
 				 * - if safe, continue (and possibly buffer later, after passing other potential checks)
-				 * need to pass timeStamp, packet interval (keyID field), discDelay, D_t, T_0, T_int (secOpts)
+				 * need to pass in the "local time T at which the packet arrived" (passed to us from handle() as timeStamp),
+				 * sender's advertised "interval index i" (keyID field), and
+				 * discDelay, D_t, T_0, T_int (all in secOpts)
 				 */
 				if (isSafePacket(timeStamp, sec_tlv.keyID, secOpts)) {
                     ptpClock->counters.safePackets++;
                 } else {
                     ptpClock->counters.unsafePackets++;
 					if (SEC_MSGS)
-						INFO("SEC: unsafe packet seqid %04x from %02x\n", ptpClock->msgTmpHeader.sequenceId,
-                        ptpClock->msgTmpHeader.sourcePortIdentity.clockIdentity[0]);
+						INFO("SEC: unsafe packet seqid %04x (interval %d) from %02x\n", ptpClock->msgTmpHeader.sequenceId,
+                        sec_tlv.keyID, ptpClock->msgTmpHeader.sourcePortIdentity.clockIdentity[0]);
                     return;
                 }
 
@@ -1647,6 +1647,9 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                                 Integer16 targetInterval = discKeyInterval - numUnverifiedBuffers + 1;
                                 Buffer *targetBuffer = ptpClock->securityDS.buffers[targetInterval];
                                 BufferedMsg *cur = targetBuffer->head;
+
+                                if (SEC_MSGS)
+                                    INFO("SEC: verifying buffered messages in buffer %d...\n", targetInterval);
                                 /*
                                   * 1. extract/copy message from buffer (correction field not zeroed yet) into local buf
                                   * 2. zero correction field
@@ -1678,9 +1681,10 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                                                               ICVKey) == FALSE) {
                                         ptpClock->counters.securityErrors++;
                                         ptpClock->counters.icvMismatchErrors++;
+										UInteger16 tmpSeqId = flip16(*(UInteger16 *) (tmpBuf + 30));
                                         if (SEC_MSGS)
-                                            INFO("SEC: icv's DIDNT MATCH on seqid %04x from interval/buffer %x\n",
-                                                 ptpClock->msgTmpHeader.sequenceId, targetInterval);
+                                            INFO("SEC: ICVs didn't match on SeqId 0x%04x from interval/buffer %x\n",
+                                                 tmpSeqId, targetInterval);
 
                                         /* 4. mark the BufferedMsg as having failed icv check */
                                         cur->icvFailed = TRUE;
@@ -1697,9 +1701,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
 								//SEC:TODO remove debug
                                 /*************************** debug buffer dump *****************************/
-                                INFO("SEC: verifying buffered messages in buffer %d...\n", targetInterval);
-                                dumpBuffer(ptpClock->securityDS.buffers[targetInterval], dumpBufferedMsg);
-
+                                //INFO("SEC: dumping buffered messages in buffer %d...\n", targetInterval);
+                                //dumpBuffer(ptpClock->securityDS.buffers[targetInterval], dumpBufferedMsg);
                                 /************************* end debug buffer dump *****************************/
                             }
 						}
@@ -1707,7 +1710,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 						else {
 							ptpClock->counters.keyVerificationFails++;
 							if (SEC_MSGS)
-                                INFO("SEC: keyver failed on key %02x (interval: %d)\n", discKey[0], discKeyInterval);
+                                INFO("SEC: Key verification failed on key %02x (interval: %d) from message w/ SeqId 0x%04x\n",
+                                     discKey[0], discKeyInterval, ptpClock->msgTmpHeader.sequenceId);
 							return;
 						}
 					}
@@ -1728,7 +1732,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
 				//SEC:TODO remove debug
                 /********************************* debuf info ****************************************/
-                /* debug info, buffering into buffer x, message type, seqid, icv first and last bytes */
+                /*
+                // debug info, buffering into buffer x, message type, seqid, icv first and last bytes
                 char messageTypeString[25];
 
                 switch (ptpClock->msgTmpHeader.messageType) {
@@ -1755,12 +1760,14 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                         break;
                 }
 
-                char firstICVByte = ptpClock->msgIbuf[packetLength + secTLVLen - secOpts->icvLength];
-                char lastICVByte = ptpClock->msgIbuf[packetLength + secTLVLen - 1];
+                // unsigned char for cleaner printing
+                unsigned char firstICVByte = (unsigned char) ptpClock->msgIbuf[packetLength + secTLVLen - secOpts->icvLength];
+                unsigned char lastICVByte = (unsigned char) ptpClock->msgIbuf[packetLength + secTLVLen - 1];
 
-                INFO("buffering msg into buff %d, type: %s (seqid %04x) w/ ICV: %02x...%02x\n",
+                INFO("SEC: buffering msg into buff %d, type: %s (seqid %04x) w/ ICV: %02x...%02x\n",
                      sec_tlv.keyID, messageTypeString, ptpClock->msgTmpHeader.sequenceId,
                      firstICVByte, lastICVByte);
+                */
                 /********************************* end debug info ****************************************/
 
 			}
@@ -1773,12 +1780,12 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.icvMismatchErrors++;
 				if (SEC_MSGS)
-					INFO("SEC: icv's DIDNT MATCH on seqid %04x\n", ptpClock->msgTmpHeader.sequenceId);
+					INFO("SEC: ICVs didn't match on SeqId 0x%04x\n", ptpClock->msgTmpHeader.sequenceId);
 				return;
 			}
 
 			/*
-             * restore correctionField to its previous value before it was zeroed out (might not even be
+             * for immediate, restore correctionField to its previous value before it was zeroed out (might not even be
              * strictly necessary since the header information from msgIbuf was already pulled out into msgTmpHeader)
              */
 			if (!secOpts->delayed && secOpts->immIgnoreCorrection) {
@@ -3523,7 +3530,7 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
         /* add security TLV, returns size, add it to length of the packet to send */
-        packetLength += addSecurityTLV(ptpClock->msgObuf, &rtOpts->securityOpts, TRUE);
+        packetLength += addSecurityTLV(ptpClock, &rtOpts->securityOpts, TRUE);
     }
 
 #ifdef RUNTIME_DEBUG
@@ -3660,7 +3667,7 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 	if (rtOpts->securityEnabled &&
 		!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock->msgObuf, &rtOpts->securityOpts, FALSE);
+		packetLength += addSecurityTLV(ptpClock, &rtOpts->securityOpts, FALSE);
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3754,7 +3761,7 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock->msgObuf, &rtOpts->securityOpts, TRUE);
+		packetLength += addSecurityTLV(ptpClock, &rtOpts->securityOpts, TRUE);
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3914,7 +3921,7 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock->msgObuf, &rtOpts->securityOpts, FALSE);
+		packetLength += addSecurityTLV(ptpClock, &rtOpts->securityOpts, FALSE);
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -3998,7 +4005,7 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock->msgObuf, &rtOpts->securityOpts, FALSE);
+		packetLength += addSecurityTLV(ptpClock, &rtOpts->securityOpts, FALSE);
 	}
 
 #ifdef RUNTIME_DEBUG
@@ -4096,7 +4103,7 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock->msgObuf, &rtOpts->securityOpts, TRUE);
+		packetLength += addSecurityTLV(ptpClock, &rtOpts->securityOpts, TRUE);
 	}
 
 #ifdef RUNTIME_DEBUG
