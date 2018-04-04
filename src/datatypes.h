@@ -341,8 +341,9 @@ typedef struct {
     /* d: the disclosure delay (in number of intervals) */
     UInteger8 disclosureDelay;
 
-    /* D_t: upper bound on 'the lag of receiver's clock w.r.t. sender's' i.e. upper bound on network delay (s)
-     * e.g. if local time is t, then the time at sender is t + D_t
+    /* D_t: upper bound on 'the lag of receiver's clock w.r.t. sender's' (page 5) i.e. upper bound on offset (s)
+     * D_t = sender time - receiver time (page 5)
+     * e.g. if local time is t, then the time at sender is t + D_t (page 8)
      */
     double D_t;
 
