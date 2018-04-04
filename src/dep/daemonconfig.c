@@ -1052,10 +1052,10 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
 								"For delayed security processing, the key disclosure delay in units of time intervals.",
 								RANGECHECK_RANGE,1,UCHAR_MAX);
 
-    /* For delayed processing, upper bound on network delay */
+    /* For delayed processing, upper bound on offset from master */
     parseResult &= configMapDouble(opCode, opArg, dict, target, "security:d_t", PTPD_RESTART_NONE,
                                    &rtOpts->securityOpts.D_t, rtOpts->securityOpts.D_t,
-                                   "For delayed security processing, upper bound on network delay",
+                                   "For delayed security processing, upper bound on offset from master",
                                    RANGECHECK_RANGE, 0, 86400);
 
 	/**************************** other security configuration settings ******************************************/
