@@ -89,7 +89,7 @@ typedef struct
      */
     uint32_t securityErrors; /* icv didn't match... */
     /* expected secure msg, but msg header didn't have security bit flipped, OR TLV type field not correct */
-    uint32_t securityTLVExpectedErrors;
+    uint32_t authenticationTLVExpectedErrors;
     /* length field from incoming message's TLV didn't match calculated length based on our security parameters */
 	uint32_t lengthMismatchErrors;
 	uint32_t SPPMismatchErrors; /* SPP from incoming message's TLV didn't match SPP from SPD query */
@@ -103,7 +103,7 @@ typedef struct
     uint32_t keyVerificationFails;
     /*
      * counters for messages sent by master before the start time, and for messages sent after the keychain is exhausted
-     * i.e. after the last time interval; such messages do not have security TLVs added
+     * i.e. after the last time interval; such messages do not have authenticationTLVs added
      */
     uint32_t unsecureMsgsSentBeforeTime;
     uint32_t unsecureMsgsSentAfterTime;
@@ -248,6 +248,9 @@ typedef enum IntegrityAlgTyp {
 	GMAC_AES256
 } IntegrityAlgTyp;
 
+#if DEFINE_SECURITY
+#define PTPD_SECURITY
+#endif /* DEFINE_SECURITY */
 /*
  * SecurityOpts struct holds security parameters that - in a future implementation that integrates with a key mgmt
  * scheme - would be provided by a security association (SA). In the current emulation, these security parameters are
@@ -256,10 +259,10 @@ typedef enum IntegrityAlgTyp {
  */
 typedef struct {
  	/*
-     * length of overall securityTLV (including Type and Length i.e. payload + 4)
+     * length of overall authenticationTLV (including Type and Length i.e. payload + 4)
      * this is the length of the TLV constant fields (10) + ICV length
      */
-	UInteger16 secTLVLen;
+	UInteger16 authTLVLen;
 
     /* security parameter pointer; enables querying the SAD for the relevant SA (unused in this emulation) */
     UInteger8 SPP;

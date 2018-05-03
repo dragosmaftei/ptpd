@@ -303,11 +303,11 @@ enum {
 	TLV_PATH_TRACE=0x0008,
 	/* Optional alternate timescale TLV */
 	ALTERNATE_TIME_OFFSET_INDICATOR=0x0009,
-	/*Security TLVs */
+	/*Authentication TLVs */
 #ifdef PTPD_SECURITY
-    SECURITY=0x000D,
+    AUTHENTICATION=0x000D,
 #endif /* PTPD_SECURITY */
-	AUTHENTICATION=0x2000,
+	//AUTHENTICATION=0x2000, /* what is this for? AUTHENTICATION defined in new standard as 000D */
 	AUTHENTICATION_CHALLENGE=0x2001,
 	SECURITY_ASSOCIATION_UPDATE=0x2002,
 	/* Cumulative frequency scale factor offset */
@@ -480,8 +480,8 @@ enum {
 #ifdef PTPD_SECURITY
 
 
-/* length of sec TLV including only constant fields (not including optional fields or ICV) */
-#define SEC_TLV_CONSTANT_LEN 10
+/* length of auth TLV including only constant fields (not including optional fields or ICV) */
+#define AUTH_TLV_CONSTANT_LEN 10
 #define MAX_SEC_KEY_LEN 32
 
 /* security parameter indicator indicating presence of disclosed key (delayed processing only) */

@@ -455,13 +455,13 @@ typedef struct {
 
 #ifdef PTPD_SECURITY
 
-/* Security TLV struct */
+/* AUTHENTICATION TLV struct */
 typedef struct {
 	#define OPERATE( name, size, type) type name;
 	/* doesn't include variable length fields (optional fields, and ICV) */
-	#include "def/securityTLV/securityTLV.def"
+	#include "def/authenticationTLV/authenticationTLV.def"
 
-} SecurityTLV;
+} AuthenticationTLV;
 #endif /* PTPD_SECURITY */
 
 /**

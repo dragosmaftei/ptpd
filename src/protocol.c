@@ -1342,21 +1342,21 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                     break;
             }
 
-            SecurityTLV sec_tlv;
+            AuthenticationTLV auth_tlv;
 
             /*
-             * unpack starting from the sec TLV start, into the tlv struct
+             * unpack starting from the authenticationTLV start, into the tlv struct
              * (this will be just constant fields, not including optional / variable length fields, or ICV)
              */
-            msgUnpackSecurityTLV(ptpClock->msgIbuf + packetLength, &sec_tlv, ptpClock);
+            msgUnpackAuthenticationTLV(ptpClock->msgIbuf + packetLength, &auth_tlv, ptpClock);
 
 			/*
-			 * we know the security flag is set; now verify TYPE field in TLV is SECURITY
+			 * we know the security flag is set; now verify TYPE field in TLV is AUTHENTICATION
 			 * check error condition first so we can just return
 			 */
-			if (sec_tlv.tlvType != SECURITY) {
+			if (auth_tlv.tlvType != AUTHENTICATION) {
 				ptpClock->counters.securityErrors++;
-				ptpClock->counters.securityTLVExpectedErrors++;
+				ptpClock->counters.authenticationTLVExpectedErrors++;
 				if (SEC_MSGS)
 					INFO("SEC: security enabled, security flag set, but TLV type not correct on seqid %04x\n",
 						 ptpClock->msgTmpHeader.sequenceId);
@@ -1371,10 +1371,10 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
 			/*
              * verify that the SPP we got from "querying the SPD" (in this emulation, the SPP is simply stored in
-             * the config file) matches the SPP on the incoming message's security TLV
+             * the config file) matches the SPP on the incoming message's authenticationTLV
              * check error condition first so we can just return
              */
-			if (sec_tlv.SPP != secOpts->SPP) {
+			if (auth_tlv.SPP != secOpts->SPP) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.SPPMismatchErrors++;
 				if (SEC_MSGS)
@@ -1393,16 +1393,16 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
      		 * in the received TLV's secParamIndicator field); this calculated length based on the security parameters
      		 * from our SA should match lengthField stored in the incoming TLV
              */
-			UInteger16 secTLVLen = secOpts->secTLVLen;
+			UInteger16 authTLVLen = secOpts->authTLVLen;
 
 			/* if delayed processing, check SPI for flag indicating the presence of the disclosed key */
 			if (secOpts->delayed &&
-				((sec_tlv.secParamIndicator & SPI_DISCLOSED_KEY) == SPI_DISCLOSED_KEY)) {
+				((auth_tlv.secParamIndicator & SPI_DISCLOSED_KEY) == SPI_DISCLOSED_KEY)) {
 				/*
                  * we're using delayed processing, and the SPI indicates that this TLV contains a disclosed key
                  * so adjust length accordingly (add key length)
                  */
-				secTLVLen += secOpts->keyLen;
+				authTLVLen += secOpts->keyLen;
 
 			} /* else, either not delayed, or delayed, but no disclosed key in this TLV, so don't adjust len */
 
@@ -1411,7 +1411,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			 * check error condition first so we can just return
 			 */
 
-			if (secTLVLen != sec_tlv.lengthField + 4) {
+			if (authTLVLen != auth_tlv.lengthField + 4) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.lengthMismatchErrors++;
 				if (SEC_MSGS)
@@ -1425,7 +1425,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 			 * if delayed, keyID has different meaning; it signals the current message's time interval, and thus doesn't
 			 * need to be checked / cross-referenced with any of our stored info
 			 */
-			if (!secOpts->delayed && secOpts->keyID != sec_tlv.keyID) {
+			if (!secOpts->delayed && secOpts->keyID != auth_tlv.keyID) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.keyIDMismatchErrors++;
 				if (SEC_MSGS)
@@ -1462,13 +1462,13 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				 * sender's advertised "interval index i" (keyID field), and
 				 * discDelay, D_t, T_0, T_int (all in secOpts)
 				 */
-				if (isSafePacket(timeStamp, sec_tlv.keyID, secOpts)) {
+				if (isSafePacket(timeStamp, auth_tlv.keyID, secOpts)) {
                     ptpClock->counters.safePackets++;
                 } else {
                     ptpClock->counters.unsafePackets++;
 					if (SEC_MSGS)
 						INFO("SEC: unsafe packet seqid %04x (interval %d) from %02x\n", ptpClock->msgTmpHeader.sequenceId,
-                        sec_tlv.keyID, ptpClock->msgTmpHeader.sourcePortIdentity.clockIdentity[0]);
+                        auth_tlv.keyID, ptpClock->msgTmpHeader.sourcePortIdentity.clockIdentity[0]);
                     return;
                 }
 
@@ -1478,8 +1478,8 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 				 * -- if it's not new, then we already have that key, and already verified its corresponding messages
 				 * -- if it's new, verify the key
 				 */
-				if ((sec_tlv.secParamIndicator & SPI_DISCLOSED_KEY) == SPI_DISCLOSED_KEY) {
-					Integer16 discKeyInterval = sec_tlv.keyID - secOpts->disclosureDelay;
+				if ((auth_tlv.secParamIndicator & SPI_DISCLOSED_KEY) == SPI_DISCLOSED_KEY) {
+					Integer16 discKeyInterval = auth_tlv.keyID - secOpts->disclosureDelay;
 
 					/* check if the disclosed key is new */
 					if (ptpClock->securityDS.latestInterval < discKeyInterval) {
@@ -1598,9 +1598,9 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                  * packet is safe; already addressed disclosed key if present by checking if it's new, verifying it,
                  * and using it to check previously buffered messages
                  * now, buffer current message into the buffer corresponding to the current interval
-                 * pass packet length including the security TLV; this should be messageLength field from header
+                 * pass packet length including the authenticationTLV; this should be messageLength field from header
                  */
-                if (!(bufferMessage(ptpClock->securityDS.buffers[sec_tlv.keyID], ptpClock->msgIbuf,
+                if (!(bufferMessage(ptpClock->securityDS.buffers[auth_tlv.keyID], ptpClock->msgIbuf,
                               ptpClock->msgTmpHeader.messageLength))) {
                     /* memory allocation in buffering the message failed - is this the right way to shutdown and exit? */
 					PERROR("SEC: failed to allocate memory for buffering message");
@@ -1639,11 +1639,11 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                 }
 
                 // unsigned char for cleaner printing
-                unsigned char firstICVByte = (unsigned char) ptpClock->msgIbuf[packetLength + secTLVLen - secOpts->icvLength];
-                unsigned char lastICVByte = (unsigned char) ptpClock->msgIbuf[packetLength + secTLVLen - 1];
+                unsigned char firstICVByte = (unsigned char) ptpClock->msgIbuf[packetLength + authTLVLen - secOpts->icvLength];
+                unsigned char lastICVByte = (unsigned char) ptpClock->msgIbuf[packetLength + authTLVLen - 1];
 
                 INFO("SEC: buffering msg into buff %d, type: %s (seqid %04x) w/ ICV: %02x...%02x\n",
-                     sec_tlv.keyID, messageTypeString, ptpClock->msgTmpHeader.sequenceId,
+                     auth_tlv.keyID, messageTypeString, ptpClock->msgTmpHeader.sequenceId,
                      firstICVByte, lastICVByte);
                 */
                 /********************************* end debug info ****************************************/
@@ -1654,7 +1654,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
              * returns false if verification fails, otherwise proceed
              */
 			else if (calculateAndVerifyICV(secOpts, (unsigned char *)ptpClock->msgIbuf,
-								  packetLength + secTLVLen - secOpts->icvLength, secOpts->key) == FALSE) {
+								  packetLength + authTLVLen - secOpts->icvLength, secOpts->key) == FALSE) {
 				ptpClock->counters.securityErrors++;
 				ptpClock->counters.icvMismatchErrors++;
 				if (SEC_MSGS)
@@ -1683,7 +1683,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                         (!secOpts->masterAcceptInsecureAnnounce && ptpClock->portDS.portState == PTP_MASTER) ||
                         (!secOpts->slaveAcceptInsecureAnnounce && ptpClock->portDS.portState == PTP_SLAVE)) {
                         ptpClock->counters.securityErrors++;
-                        ptpClock->counters.securityTLVExpectedErrors++;
+                        ptpClock->counters.authenticationTLVExpectedErrors++;
                         if (SEC_MSGS)
                             INFO("SEC: security enabled, expecting secured announce messages, but message is missing security flag in header on seqid %04x\n",
                                  ptpClock->msgTmpHeader.sequenceId);
@@ -1699,7 +1699,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                         (!secOpts->masterAcceptInsecureSyncFollowup && ptpClock->portDS.portState == PTP_MASTER) ||
                         (!secOpts->slaveAcceptInsecureSyncFollowup && ptpClock->portDS.portState == PTP_SLAVE)) {
                         ptpClock->counters.securityErrors++;
-                        ptpClock->counters.securityTLVExpectedErrors++;
+                        ptpClock->counters.authenticationTLVExpectedErrors++;
                         if (SEC_MSGS)
                             INFO("SEC: security enabled, expecting secured sync & followup messages, but message is missing security flag in header on seqid %04x\n",
                                  ptpClock->msgTmpHeader.sequenceId);
@@ -1717,7 +1717,7 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
                         (!secOpts->masterAcceptInsecurePdelays && ptpClock->portDS.portState == PTP_MASTER) ||
                         (!secOpts->slaveAcceptInsecurePdelays && ptpClock->portDS.portState == PTP_SLAVE)) {
                         ptpClock->counters.securityErrors++;
-                        ptpClock->counters.securityTLVExpectedErrors++;
+                        ptpClock->counters.authenticationTLVExpectedErrors++;
                         if (SEC_MSGS)
                             INFO("SEC: security enabled, expecting secured pdelay messages, but message is missing security flag in header on seqid %04x\n",
                                  ptpClock->msgTmpHeader.sequenceId);
@@ -3374,7 +3374,7 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
 
 	msgPackAnnounce(ptpClock->msgObuf, *sequenceId, &originTimestamp, ptpClock);
 
-	/* use packetLength variable, add size of securityTLV if security is on */
+	/* use packetLength variable, add size of authenticationTLV if security is on */
     UInteger16 packetLength = ANNOUNCE_LENGTH;
 
 #ifdef PTPD_SECURITY
@@ -3390,8 +3390,8 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
      */
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
-        /* add security TLV, returns size, add it to length of the packet to send */
-        packetLength += addSecurityTLV(ptpClock, &rtOpts->securityOpts, TRUE);
+        /* add authentication TLV, returns size, add it to length of the packet to send */
+        packetLength += addAuthenticationTLV(ptpClock, &rtOpts->securityOpts, TRUE);
     }
 #endif /* PTPD_SECURITY */
 
@@ -3501,14 +3501,14 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 
 	msgPackSync(ptpClock->msgObuf,*sequenceId,&originTimestamp,ptpClock);
 
-	/* use packetLength variable, add size of securityTLV if security is on */
+	/* use packetLength variable, add size of authenticationTLV if security is on */
 	UInteger16 packetLength = SYNC_LENGTH;
 
 #ifdef PTPD_SECURITY
 	if (rtOpts->securityEnabled &&
 		!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
-		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock, &rtOpts->securityOpts, FALSE);
+		/* add authentication TLV, returns size, add it to length of the packet to send */
+		packetLength += addAuthenticationTLV(ptpClock, &rtOpts->securityOpts, FALSE);
 	}
 #endif /* PTPD_SECURITY */
 
@@ -3576,14 +3576,14 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 	
 	msgPackFollowUp(ptpClock->msgObuf,&preciseOriginTimestamp,ptpClock,sequenceId);
 
-	/* use packetLength variable, add size of securityTLV if security is on */
+	/* use packetLength variable, add size of authenticationTLV if security is on */
 	UInteger16 packetLength = FOLLOW_UP_LENGTH;
 
 #ifdef PTPD_SECURITY
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
-		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock, &rtOpts->securityOpts, TRUE);
+		/* add authentication TLV, returns size, add it to length of the packet to send */
+		packetLength += addAuthenticationTLV(ptpClock, &rtOpts->securityOpts, TRUE);
 	}
 #endif /* PTPD_SECURITY */
 
@@ -3717,14 +3717,14 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 	
 	msgPackPdelayReq(ptpClock->msgObuf,&originTimestamp,ptpClock);
 
-	/* use packetLength variable, add size of securityTLV if security is on */
+	/* use packetLength variable, add size of authenticationTLV if security is on */
 	UInteger16 packetLength = PDELAY_REQ_LENGTH;
 
 #ifdef PTPD_SECURITY
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
-		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock, &rtOpts->securityOpts, FALSE);
+		/* add authentication TLV, returns size, add it to length of the packet to send */
+		packetLength += addAuthenticationTLV(ptpClock, &rtOpts->securityOpts, FALSE);
 	}
 #endif /* PTPD_SECURITY */
 
@@ -3782,14 +3782,14 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 	msgPackPdelayResp(ptpClock->msgObuf,header,
 			  &requestReceiptTimestamp,ptpClock);
 
-	/* use packetLength variable, add size of securityTLV if security is on */
+	/* use packetLength variable, add size of authenticationTLV if security is on */
 	UInteger16 packetLength = PDELAY_RESP_LENGTH;
 
 #ifdef PTPD_SECURITY
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
-		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock, &rtOpts->securityOpts, FALSE);
+		/* add authentication TLV, returns size, add it to length of the packet to send */
+		packetLength += addAuthenticationTLV(ptpClock, &rtOpts->securityOpts, FALSE);
 	}
 #endif /* PTPD_SECURITY */
 
@@ -3861,14 +3861,14 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 	msgPackPdelayRespFollowUp(ptpClock->msgObuf,header,
 				  &responseOriginTimestamp,ptpClock, sequenceId);
 
-	/* use packetLength variable, add size of securityTLV if security is on */
+	/* use packetLength variable, add size of authenticationTLV if security is on */
 	UInteger16 packetLength = PDELAY_RESP_FOLLOW_UP_LENGTH;
 
 #ifdef PTPD_SECURITY
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
-		/* add security TLV, returns size, add it to length of the packet to send */
-		packetLength += addSecurityTLV(ptpClock, &rtOpts->securityOpts, TRUE);
+		/* add authentication TLV, returns size, add it to length of the packet to send */
+		packetLength += addAuthenticationTLV(ptpClock, &rtOpts->securityOpts, TRUE);
 	}
 #endif /* PTPD_SECURITY */
 

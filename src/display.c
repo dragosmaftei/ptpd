@@ -979,8 +979,8 @@ displayCounters(const PtpClock * ptpClock)
 #ifdef PTPD_SECURITY
 	INFO("           securityErrors : %lu\n",
 		 (unsigned long)ptpClock->counters.securityErrors);
-    INFO("           securityTLVExpectedErrors : %lu\n",
-         (unsigned long)ptpClock->counters.securityTLVExpectedErrors);
+    INFO("           authenticationTLVExpectedErrors : %lu\n",
+         (unsigned long)ptpClock->counters.authenticationTLVExpectedErrors);
     INFO("           lengthMismatchErrors : %lu\n",
          (unsigned long)ptpClock->counters.lengthMismatchErrors);
     INFO("           SPPMismatchErrors : %lu\n",

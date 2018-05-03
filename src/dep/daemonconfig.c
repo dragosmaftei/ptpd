@@ -998,7 +998,7 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
      * not sure about restart flags, using PTPD_RESTART_NONE for now
      */
     parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:enable", PTPD_RESTART_NONE, &rtOpts->securityEnabled, rtOpts->securityEnabled,
-                                    "Enable experimental security feature using security TLV.");
+                                    "Enable experimental security feature using authenticationTLV.");
 
 	/* specify immediate (e.g. GDOI) or delayed (e.g. TESLA) key management */
 	parseResult &= configMapBoolean(opCode, opArg, dict, target, "security:delayed", PTPD_RESTART_NONE,
@@ -2675,15 +2675,15 @@ parseConfig ( int opCode, void *opArg, dictionary* dict, RunTimeOpts *rtOpts )
         if (memcmp(HMAC_SHA256_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(HMAC_SHA256_OID) - 1) == 0) {
             rtOpts->securityOpts.integrityAlgTyp = HMAC_SHA256;
             rtOpts->securityOpts.icvLength = HMAC_SHA256_ICV_LEN;
-            rtOpts->securityOpts.secTLVLen = SEC_TLV_CONSTANT_LEN + HMAC_SHA256_ICV_LEN;
+            rtOpts->securityOpts.authTLVLen = AUTH_TLV_CONSTANT_LEN + HMAC_SHA256_ICV_LEN;
         } else if (memcmp(GMAC_OID, rtOpts->securityOpts.integrityAlgTypOID, sizeof(GMAC_OID) - 1) == 0) {
             rtOpts->securityOpts.integrityAlgTyp = GMAC_AES256;
             /*
              * for GMAC, the calculated MAC/tag/ICV is 16, but it must be sent along with the randomized IV (12)
-             * that it gets generated with... thus total secTLV len includes IV
+             * that it gets generated with... thus total authTLV len includes IV
              */
             rtOpts->securityOpts.icvLength = GMAC_ICV_LEN;
-            rtOpts->securityOpts.secTLVLen = SEC_TLV_CONSTANT_LEN + GMAC_IV_LEN + GMAC_ICV_LEN;
+            rtOpts->securityOpts.authTLVLen = AUTH_TLV_CONSTANT_LEN + GMAC_IV_LEN + GMAC_ICV_LEN;
         } else {
             WARNING("The algorithm OID provided does not match; using HMAC as default\n");
         }

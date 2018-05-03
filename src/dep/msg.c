@@ -1713,9 +1713,9 @@ msgPackHeader(Octet * buf, PtpClock * ptpClock)
 
 #ifdef PTPD_SECURITY
 
-/* these only pack and unpack constant length fields of the security TLV, see securityTLV.def */
+/* these only pack and unpack constant length fields of the authenticationTLV, see authenticationTLV.def */
 void
-msgUnpackSecurityTLV(Octet * buf, SecurityTLV *data, PtpClock *ptpClock)
+msgUnpackAuthenticationTLV(Octet * buf, AuthenticationTLV *data, PtpClock *ptpClock)
 {
     int offset = 0;
 
@@ -1723,10 +1723,10 @@ msgUnpackSecurityTLV(Octet * buf, SecurityTLV *data, PtpClock *ptpClock)
 	    	    unpack##type (buf + offset, &data->name, ptpClock); \
 		        offset = offset + size;
 
-    #include "../def/securityTLV/securityTLV.def"
+    #include "../def/authenticationTLV/authenticationTLV.def"
 }
 
-void msgPackSecurityTLV(SecurityTLV *data, Octet *buf)
+void msgPackAuthenticationTLV(AuthenticationTLV *data, Octet *buf)
 {
     int offset = 0;
 
@@ -1734,16 +1734,16 @@ void msgPackSecurityTLV(SecurityTLV *data, Octet *buf)
 	    	pack##type (&data->name, buf + offset); \
 		    offset = offset + size;
 
-    #include "../def/securityTLV/securityTLV.def"
+    #include "../def/authenticationTLV/authenticationTLV.def"
 }
 
 /*
  * this gets called in issue<messageType> functions, after the buffer has been packed (including header)
  * - Boolean msgClassGeneral (as in, message type, general vs. event) is used for delayed security processing to
  * decide whether to consider including a disclosed key in this message (should not disclose key in event messages)
- * - return value is the length of the securityTLV that was added to the buffer
+ * - return value is the length of the authenticationTLV that was added to the buffer
  */
-UInteger16 addSecurityTLV(PtpClock *ptpClock, const SecurityOpts *secOpts, Boolean msgClassGeneral)
+UInteger16 addAuthenticationTLV(PtpClock *ptpClock, const SecurityOpts *secOpts, Boolean msgClassGeneral)
 {
     /* output buffer (PTP header start) */
     Octet *buf = ptpClock->msgObuf;
@@ -1755,11 +1755,11 @@ UInteger16 addSecurityTLV(PtpClock *ptpClock, const SecurityOpts *secOpts, Boole
      */
 
     /*
-     * only this secTLVLen (constant secTLV length + icv length) is pulled down into a local variable (as opposed to
+     * only this authTLVLen (constant authTLV length + icv length) is pulled down into a local variable (as opposed to
      * being accessed through secOpts) since it might get adjusted for optional fields on a per message basis depending
      * on the key disclosure
      */
-    UInteger16 secTLVLen = secOpts->secTLVLen;
+    UInteger16 authTLVLen = secOpts->authTLVLen;
 
     /* for delayed processing, we will need to calculate current interval */
     UInteger16 currentInterval = 0;
@@ -1804,43 +1804,43 @@ UInteger16 addSecurityTLV(PtpClock *ptpClock, const SecurityOpts *secOpts, Boole
         if (msgClassGeneral && (discKeyInterval >= 0)) {
             discloseKey = TRUE;
             /* since we're disclosing a key, adjust length accordingly (add key length) */
-            secTLVLen += secOpts->keyLen;
+            authTLVLen += secOpts->keyLen;
         }
     }
 
     *(UInteger8 *) (buf + 6) |= PTP_SECURITY; /* adding security flag to the header */
 
     UInteger16  msg_len = flip16(*(UInteger16 *) (buf + 2)); /* get message length out from the header */
-    /* adjusting the header's message length field to account for sec TLV */
-    *(UInteger16 *) (buf + 2) = flip16(msg_len + secTLVLen);
+    /* adjusting the header's message length field to account for authenticationTLV */
+    *(UInteger16 *) (buf + 2) = flip16(msg_len + authTLVLen);
 
     /*
      * make TLV struct and populate it (albeit with only the constant-length components of the TLV) before packing the
      * buffer via the packing function; this is preferable to packing everything by hand directly into the buffer
      */
-    SecurityTLV sec_tlv;
-    memset(&sec_tlv, 0, SEC_TLV_CONSTANT_LEN);
-    sec_tlv.tlvType = SECURITY;
-    sec_tlv.lengthField = secTLVLen - 4; /* -4 to discount TYPE and LENGTH (2 bytes each) */
-    sec_tlv.SPP = secOpts->SPP;
+    AuthenticationTLV auth_tlv;
+    memset(&auth_tlv, 0, AUTH_TLV_CONSTANT_LEN);
+    auth_tlv.tlvType = AUTHENTICATION;
+    auth_tlv.lengthField = authTLVLen - 4; /* -4 to discount TYPE and LENGTH (2 bytes each) */
+    auth_tlv.SPP = secOpts->SPP;
 
     /* for delayed, keyID field stores the current time interval */
     if (secOpts->delayed) {
-        sec_tlv.keyID = currentInterval;
+        auth_tlv.keyID = currentInterval;
     } else {
-        sec_tlv.keyID = secOpts->keyID;
+        auth_tlv.keyID = secOpts->keyID;
     }
 
     /* if disclosed key needs to be included, this must be indicated in the secParamIndicator's disclosedKey bit */
     if (discloseKey) {
-        sec_tlv.secParamIndicator |= SPI_DISCLOSED_KEY;
-    } /* else this flag will remain 0, as the whole sec_tlv was initialized to 0 */
+        auth_tlv.secParamIndicator |= SPI_DISCLOSED_KEY;
+    } /* else this flag will remain 0, as the whole auth_tlv was initialized to 0 */
 
     /*
      * pack the buffer with what we have so far for the TLV; avoiding the padding inherent in structs
-     * start at end of message, which is the start of the secTLV (i.e. buf + msg_len)
+     * start at end of message, which is the start of the authTLV (i.e. buf + msg_len)
      */
-    msgPackSecurityTLV(&sec_tlv, buf + msg_len);
+    msgPackAuthenticationTLV(&auth_tlv, buf + msg_len);
 
     /* pack the disclosed key if necessary */
     if (discloseKey) {
@@ -1862,7 +1862,7 @@ UInteger16 addSecurityTLV(PtpClock *ptpClock, const SecurityOpts *secOpts, Boole
         /******* end debug printing the disclosed key ********/
 
         /* add disclosed key at 10th byte offset (constant length fields = 10 bytes) */
-        memcpy(buf + msg_len + SEC_TLV_CONSTANT_LEN, disclosedKey, secOpts->keyLen);
+        memcpy(buf + msg_len + AUTH_TLV_CONSTANT_LEN, disclosedKey, secOpts->keyLen);
     }
 
     /*
@@ -1897,7 +1897,7 @@ UInteger16 addSecurityTLV(PtpClock *ptpClock, const SecurityOpts *secOpts, Boole
 
     /* passing in security parameters, buffer (start of PTP header), ICV offset, and the key */
     calculateAndPackICV(secOpts, (unsigned char *)buf,
-                        msg_len + secTLVLen - secOpts->icvLength, key);
+                        msg_len + authTLVLen - secOpts->icvLength, key);
 
     /*
      * for delayed (or if imm but ignoring correction field),
@@ -1909,7 +1909,7 @@ UInteger16 addSecurityTLV(PtpClock *ptpClock, const SecurityOpts *secOpts, Boole
         memcpy((buf + 12), &correctionFieldTmp.lsb, 4);
     }
 
-    return secTLVLen;
+    return authTLVLen;
 }
 
 /*
@@ -1996,7 +1996,7 @@ Boolean calculateAndVerifyICV(const SecurityOpts *secOpts, unsigned char *buf, U
 
             /*
              * ICV gets truncated to 128 bits, so compare only 16 bytes
-             * msgIbuf + packetLength is the start of the secTLV, + total TLV len - ICV len = start of ICV
+             * msgIbuf + packetLength is the start of the authTLV, + total TLV len - ICV len = start of ICV
              */
             if (memcmp(static_digest, buf + icvOffset, secOpts->icvLength)) {
                 return FALSE;

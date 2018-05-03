@@ -114,7 +114,7 @@ void dumpBufferedMsg(BufferedMsg *bm) {
 
     char messageTypeString[25];
 
-    UInteger16 packetLength; /* this is also the secTLV offset */
+    UInteger16 packetLength; /* this is also the authTLV offset */
 
     switch (header.messageType) {
         case ANNOUNCE:
