@@ -660,49 +660,6 @@ typedef struct {
 #endif /* PTPD_SECURITY */
 } RunTimeOpts;
 
-#if defined(PTPD_SECURITY) && defined(RUNTIME_DEBUG)
-/* struct to measure extra processing time added by security processing */
-typedef struct {
-    int numAnnounceMeasurements;
-	struct timespec announces[MAX_NUM_TIMING_MEASUREMENTS];
-    struct timespec announceTotals;
-    int numSyncMeasurements;
-	struct timespec syncs[MAX_NUM_TIMING_MEASUREMENTS];
-    struct timespec syncTotals;
-    int numFollowupMeasurements;
-	struct timespec followups[MAX_NUM_TIMING_MEASUREMENTS];
-    struct timespec followupTotals;
-    int numPdelayreqMeasurements;
-	struct timespec pdelayreqs[MAX_NUM_TIMING_MEASUREMENTS];
-    struct timespec pdelayreqTotals;
-    int numPdelayrespMeasurements;
-	struct timespec pdelayresps[MAX_NUM_TIMING_MEASUREMENTS];
-    struct timespec pdelayrespTotals;
-    int numPdelayrespfollowupMeasurements;
-	struct timespec pdelayrespfollowups[MAX_NUM_TIMING_MEASUREMENTS];
-    struct timespec pdelayrespfollowupTotals;
-
-	int numRecvAnnounceMeasurements;
-	struct timespec recvAnnounces[MAX_NUM_TIMING_MEASUREMENTS];
-	struct timespec recvAnnounceTotals;
-	int numRecvSyncMeasurements;
-	struct timespec recvSyncs[MAX_NUM_TIMING_MEASUREMENTS];
-	struct timespec recvSyncTotals;
-	int numRecvFollowupMeasurements;
-	struct timespec recvFollowups[MAX_NUM_TIMING_MEASUREMENTS];
-	struct timespec recvFollowupTotals;
-	int numRecvPdelayreqMeasurements;
-	struct timespec recvPdelayreqs[MAX_NUM_TIMING_MEASUREMENTS];
-	struct timespec recvPdelayreqTotals;
-	int numRecvPdelayrespMeasurements;
-	struct timespec recvPdelayresps[MAX_NUM_TIMING_MEASUREMENTS];
-	struct timespec recvPdelayrespTotals;
-	int numRecvPdelayrespfollowupMeasurements;
-	struct timespec recvPdelayrespfollowups[MAX_NUM_TIMING_MEASUREMENTS];
-	struct timespec recvPdelayrespfollowupTotals;
-} SecurityTiming;
-#endif /* PTPD_SECURITY & RUNTIME_DEBUG */
-
 /**
  * \struct PtpClock
  * \brief Main program data structure
@@ -946,9 +903,6 @@ typedef struct {
 #ifdef PTPD_SECURITY
     /* dataset for security processing */
     SecurityDS securityDS;
-#ifdef RUNTIME_DEBUG
-    SecurityTiming securityTiming;
-#endif /* RUNTIME_DEBUG */
 #endif /* PTPD_SECURITY */
 
 } PtpClock;

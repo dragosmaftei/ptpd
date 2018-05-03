@@ -1237,119 +1237,7 @@ timestampCorrection(const RunTimeOpts * rtOpts, PtpClock *ptpClock, TimeInternal
 
 }
 
-#if DEFINE_SECURITY
-#define PTPD_SECURITY
-#endif /* DEFINE_SECURITY */
-
-
 #ifdef PTPD_SECURITY
-#ifdef RUNTIME_DEBUG
-/* function to facilitate measuring how long security processing takes */
-void
-recordTimingMeasurement(PtpClock *ptpClock, Enumeration4Lower type, Boolean recv,
-                        struct timespec *stop, struct timespec *start)
-{
-	int *numMeasurements;
-	struct timespec *totals;
-    struct timespec *array;
-
-	//INFO("SEC: recordTimingMeasurement: type is: %02x\n", type);
-
-	switch (type) {
-		case ANNOUNCE:
-			if (recv) {
-				numMeasurements = &ptpClock->securityTiming.numRecvAnnounceMeasurements;
-				totals = &ptpClock->securityTiming.recvAnnounceTotals;
-                array = ptpClock->securityTiming.recvAnnounces;
-			} else {
-				numMeasurements = &ptpClock->securityTiming.numAnnounceMeasurements;
-				totals = &ptpClock->securityTiming.announceTotals;
-                array = ptpClock->securityTiming.announces;
-			}
-			break;
-		case SYNC:
-			if (recv) {
-				numMeasurements = &ptpClock->securityTiming.numRecvSyncMeasurements;
-				totals = &ptpClock->securityTiming.recvSyncTotals;
-                array = ptpClock->securityTiming.recvSyncs;
-			} else {
-				numMeasurements = &ptpClock->securityTiming.numSyncMeasurements;
-				totals = &ptpClock->securityTiming.syncTotals;
-                array = ptpClock->securityTiming.syncs;
-			}
-			break;
-		case FOLLOW_UP:
-			if (recv) {
-				numMeasurements = &ptpClock->securityTiming.numRecvFollowupMeasurements;
-				totals = &ptpClock->securityTiming.recvFollowupTotals;
-                array = ptpClock->securityTiming.recvFollowups;
-			} else {
-				numMeasurements = &ptpClock->securityTiming.numFollowupMeasurements;
-				totals = &ptpClock->securityTiming.followupTotals;
-                array = ptpClock->securityTiming.followups;
-			}
-			break;
-		case PDELAY_REQ:
-			if (recv) {
-				numMeasurements = &ptpClock->securityTiming.numRecvPdelayreqMeasurements;
-				totals = &ptpClock->securityTiming.recvPdelayreqTotals;
-                array = ptpClock->securityTiming.recvPdelayreqs;
-			} else {
-				numMeasurements = &ptpClock->securityTiming.numPdelayreqMeasurements;
-				totals = &ptpClock->securityTiming.pdelayreqTotals;
-                array = ptpClock->securityTiming.pdelayreqs;
-			}
-			break;
-		case PDELAY_RESP:
-			if (recv) {
-				numMeasurements = &ptpClock->securityTiming.numRecvPdelayrespMeasurements;
-				totals = &ptpClock->securityTiming.recvPdelayrespTotals;
-                array = ptpClock->securityTiming.recvPdelayresps;
-			} else {
-				numMeasurements = &ptpClock->securityTiming.numPdelayrespMeasurements;
-				totals = &ptpClock->securityTiming.pdelayrespTotals;
-                array = ptpClock->securityTiming.pdelayresps;
-			}
-			break;
-		case PDELAY_RESP_FOLLOW_UP:
-			if (recv) {
-				numMeasurements = &ptpClock->securityTiming.numRecvPdelayrespfollowupMeasurements;
-				totals = &ptpClock->securityTiming.recvPdelayrespfollowupTotals;
-                array = ptpClock->securityTiming.recvPdelayrespfollowups;
-			} else {
-				numMeasurements = &ptpClock->securityTiming.numPdelayrespfollowupMeasurements;
-				totals = &ptpClock->securityTiming.pdelayrespfollowupTotals;
-                array = ptpClock->securityTiming.pdelayrespfollowups;
-			}
-			break;
-		default:
-			return;
-	}
-
-	/* if we already got 1,000 measurements, that's good enough... */
-    if (*numMeasurements < 1000) {
-        struct timespec diff;
-        /* if rollover, adjust (ex: 2.6 - 1.9) */
-        if (stop->tv_nsec - start->tv_nsec < 0) {
-            diff.tv_sec = stop->tv_sec - start->tv_sec - 1;
-            diff.tv_nsec = stop->tv_nsec - start->tv_nsec + 1000000000;
-        }
-        /* regular case */
-        else {
-            diff.tv_sec = stop->tv_sec - start->tv_sec;
-            diff.tv_nsec = stop->tv_nsec - start->tv_nsec;
-        }
-        /* store the diff in the array for later statistics if needed */
-        array[*numMeasurements] = diff;
-        /* also keep a running total to make getting an average easier */
-        totals->tv_sec += diff.tv_sec;
-        totals->tv_nsec += diff.tv_nsec;
-
-		(*numMeasurements)++;
-	}
-}
-#endif /* RUNTIME_DEBUG */
-
 /*
  * determine whether the received packet is safe (RFC 4082 section 3.5.1)
  * a safe packet is one whose ICV is based on a safe key
@@ -1372,7 +1260,6 @@ Boolean isSafePacket(TimeInternal *recvTime, UInteger32 i, SecurityOpts *secOpts
 	 */
 	return (x < i + secOpts->disclosureDelay) ? TRUE : FALSE;
 }
-
 #endif /* PTPD_SECURITY */
 
 void
@@ -1412,15 +1299,6 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
 
 
 #ifdef PTPD_SECURITY
-
-#ifdef RUNTIME_DEBUG
-	/* measure extra processing time added by the security processing */
-    struct timespec start, stop;
-
-    if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
-        if(SEC_MSGS) INFO("SEC: get start time in receive failed\n");
-#endif /* RUNTIME_DEBUG */
-
     /*
      * 'securityEnabled' emulates getting the policy limiting fields from the PTP header and querying the SPD to
      * answer the question 'do we want security processing on this packet?' if yes, the query would return an SPP
@@ -1853,15 +1731,6 @@ processMessage(RunTimeOpts* rtOpts, PtpClock* ptpClock, TimeInternal* timeStamp,
             }
         }
     }
-
-#ifdef RUNTIME_DEBUG
-    if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
-        if(SEC_MSGS) INFO("SEC: get stop time in receive failed\n");
-
-    /* this will increment the num measurements and add the current measurement to a running total */
-    recordTimingMeasurement(ptpClock, ptpClock->msgTmpHeader.messageType, TRUE, &stop, &start);
-    /* done measuring security processing time */
-#endif /* RUNTIME_DEBUG */
 
 #endif /* PTPD_SECURITY */
 
@@ -3509,14 +3378,6 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
     UInteger16 packetLength = ANNOUNCE_LENGTH;
 
 #ifdef PTPD_SECURITY
-#ifdef RUNTIME_DEBUG
-	struct timespec start, stop;
-
-	// timing measurement of security processing
-	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
-		if(SEC_MSGS) INFO("SEC: get start time in send sync failed\n");
-#endif /* RUNTIME_DEBUG */
-
 	/*
      * 'securityEnabled' emulates getting the policy limiting fields from the PTP header and querying the SPD to
      * answer the question 'do we want security processing on this packet?' if yes, the query would return an SPP
@@ -3532,17 +3393,6 @@ issueAnnounceSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rt
         /* add security TLV, returns size, add it to length of the packet to send */
         packetLength += addSecurityTLV(ptpClock, &rtOpts->securityOpts, TRUE);
     }
-
-#ifdef RUNTIME_DEBUG
-
-	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
-		if(SEC_MSGS) INFO("SEC: get stop time in send sync failed\n");
-
-	// this will increment the num measurements and add the current measurement to a running total
-	recordTimingMeasurement(ptpClock, ANNOUNCE, FALSE, &stop, &start);
-	// done measuring security processing time
-#endif /* RUNTIME_DEBUG */
-
 #endif /* PTPD_SECURITY */
 
 	if (!netSendGeneral(ptpClock->msgObuf,packetLength,
@@ -3655,30 +3505,11 @@ issueSyncSingle(Integer32 dst, UInteger16 *sequenceId, const RunTimeOpts *rtOpts
 	UInteger16 packetLength = SYNC_LENGTH;
 
 #ifdef PTPD_SECURITY
-
-#ifdef RUNTIME_DEBUG
-	struct timespec start, stop;
-
-    /* timing measurement of security processing */
-	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
-		if(SEC_MSGS) INFO("SEC: get start time in send sync failed\n");
-#endif /* RUNTIME_DEBUG */
-
 	if (rtOpts->securityEnabled &&
 		!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
 		packetLength += addSecurityTLV(ptpClock, &rtOpts->securityOpts, FALSE);
 	}
-
-#ifdef RUNTIME_DEBUG
-	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
-		if(SEC_MSGS) INFO("SEC: get stop time in send sync failed\n");
-
-    /* this will increment the num measurements and add the current measurement to a running total */
-	recordTimingMeasurement(ptpClock, SYNC, FALSE, &stop, &start);
-    /* done measuring security processing time */
-#endif /* RUNTIME_DEBUG */
-
 #endif /* PTPD_SECURITY */
 
 	if (!netSendEvent(ptpClock->msgObuf,packetLength,&ptpClock->netPath,
@@ -3749,30 +3580,11 @@ issueFollowup(const TimeInternal *tint,const RunTimeOpts *rtOpts,PtpClock *ptpCl
 	UInteger16 packetLength = FOLLOW_UP_LENGTH;
 
 #ifdef PTPD_SECURITY
-
-#ifdef RUNTIME_DEBUG
-	struct timespec start, stop;
-
-	/* timing measurement of security processing */
-	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
-		if(SEC_MSGS) INFO("SEC: get start time in send sync failed\n");
-#endif /* RUNTIME_DEBUG */
-
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
 		packetLength += addSecurityTLV(ptpClock, &rtOpts->securityOpts, TRUE);
 	}
-
-#ifdef RUNTIME_DEBUG
-	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
-		if(SEC_MSGS) INFO("SEC: get stop time in send sync failed\n");
-
-	/* this will increment the num measurements and add the current measurement to a running total */
-	recordTimingMeasurement(ptpClock, FOLLOW_UP, FALSE, &stop, &start);
-	/* done measuring security processing time */
-#endif /* RUNTIME_DEBUG */
-
 #endif /* PTPD_SECURITY */
 
 	if (!netSendGeneral(ptpClock->msgObuf,packetLength,
@@ -3909,30 +3721,11 @@ issuePdelayReq(const RunTimeOpts *rtOpts,PtpClock *ptpClock)
 	UInteger16 packetLength = PDELAY_REQ_LENGTH;
 
 #ifdef PTPD_SECURITY
-
-#ifdef RUNTIME_DEBUG
-	struct timespec start, stop;
-
-	/* timing measurement of security processing */
-	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
-		if(SEC_MSGS) INFO("SEC: get start time in send sync failed\n");
-#endif /* RUNTIME_DEBUG */
-
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
 		packetLength += addSecurityTLV(ptpClock, &rtOpts->securityOpts, FALSE);
 	}
-
-#ifdef RUNTIME_DEBUG
-	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
-		if(SEC_MSGS) INFO("SEC: get stop time in send sync failed\n");
-
-	/* this will increment the num measurements and add the current measurement to a running total */
-	recordTimingMeasurement(ptpClock, PDELAY_REQ, FALSE, &stop, &start);
-	/* done measuring security processing time */
-#endif /* RUNTIME_DEBUG */
-
 #endif /* PTPD_SECURITY */
 
 	if (!netSendPeerEvent(ptpClock->msgObuf,packetLength,
@@ -3993,30 +3786,11 @@ issuePdelayResp(const TimeInternal *tint,MsgHeader *header, Integer32 sourceAddr
 	UInteger16 packetLength = PDELAY_RESP_LENGTH;
 
 #ifdef PTPD_SECURITY
-
-#ifdef RUNTIME_DEBUG
-	struct timespec start, stop;
-
-	/* timing measurement of security processing */
-	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
-		if(SEC_MSGS) INFO("SEC: get start time in send sync failed\n");
-#endif /* RUNTIME_DEBUG */
-
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
 		packetLength += addSecurityTLV(ptpClock, &rtOpts->securityOpts, FALSE);
 	}
-
-#ifdef RUNTIME_DEBUG
-	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
-		if(SEC_MSGS) INFO("SEC: get stop time in send sync failed\n");
-
-	/* this will increment the num measurements and add the current measurement to a running total */
-	recordTimingMeasurement(ptpClock, PDELAY_RESP, FALSE, &stop, &start);
-	/* done measuring security processing time */
-#endif /* RUNTIME_DEBUG */
-
 #endif /* PTPD_SECURITY */
 
 	if (!netSendPeerEvent(ptpClock->msgObuf,packetLength,
@@ -4091,30 +3865,11 @@ issuePdelayRespFollowUp(const TimeInternal *tint, MsgHeader *header, Integer32 d
 	UInteger16 packetLength = PDELAY_RESP_FOLLOW_UP_LENGTH;
 
 #ifdef PTPD_SECURITY
-
-#ifdef RUNTIME_DEBUG
-	struct timespec start, stop;
-
-	/* timing measurement of security processing */
-	if(clock_gettime(CLOCK_MONOTONIC_RAW, &start))
-		if(SEC_MSGS) INFO("SEC: get start time in send sync failed\n");
-#endif /* RUNTIME_DEBUG */
-
 	if (rtOpts->securityEnabled &&
 			!(rtOpts->securityOpts.delayed && ptpClock->portDS.portState == PTP_SLAVE)) {
 		/* add security TLV, returns size, add it to length of the packet to send */
 		packetLength += addSecurityTLV(ptpClock, &rtOpts->securityOpts, TRUE);
 	}
-
-#ifdef RUNTIME_DEBUG
-	if(clock_gettime(CLOCK_MONOTONIC_RAW, &stop))
-		if(SEC_MSGS) INFO("SEC: get stop time in send sync failed\n");
-
-	/* this will increment the num measurements and add the current measurement to a running total */
-	recordTimingMeasurement(ptpClock, PDELAY_RESP_FOLLOW_UP, FALSE, &stop, &start);
-	/* done measuring security processing time */
-#endif /* RUNTIME_DEBUG */
-
 #endif /* PTPD_SECURITY */
 
 	if (!netSendPeerGeneral(ptpClock->msgObuf, packetLength,

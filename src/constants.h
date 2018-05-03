@@ -522,10 +522,6 @@ enum {
 #define HMAC_SHA1_OID "\x06\x08\x2a\x86\x48\x86\xf7\x0d\x02\x09"
 
 
-#ifdef RUNTIME_DEBUG
-#define MAX_NUM_TIMING_MEASUREMENTS 1000
-#endif /* RUNTIME_DEBUG */
-
 #endif /* PTPD_SECURITY */
 
 #endif /*CONSTANTS_H_*/
