@@ -102,7 +102,7 @@ unsigned char *ptpd_HMAC(void *evp_md, const void *key,
 
 
 /*
- * this code is adopted from Jeffrey Walton https://pastebin.com/v3J93Cj4
+ * this code is adopted from Jeffrey Walton's example at https://pastebin.com/v3J93Cj4
  * return
  */
 int GMAC(const unsigned char *key,
